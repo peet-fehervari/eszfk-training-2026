@@ -1,0 +1,21 @@
+; CPF merge for the DATA instance of stack 2 - the instance that owns the data.
+;
+; Prepared here so the stack is usable immediately:
+;   - SuperUser is logon-ready (same as common/merge-base.cpf)
+;   - TRAINDATA database exists: this is the database the code instance will
+;     mount remotely over ECP
+;   - DATA namespace exists over it, so the data can be inspected locally to
+;     prove where it really lives
+;
+; Deliberately NOT prepared - this is the exercise (see ../EXERCISE.md):
+;   - %Service_ECP is left disabled. ECP is off by default on 2026.1, and turning
+;     it on is the first step of the exercise.
+
+[Actions]
+ModifyUser:Name=SuperUser,ChangePassword=0
+
+; Directory lives under the instance data directory, which is the named volume,
+; so the database survives a container restart.
+CreateDatabase:Name=TRAINDATA,Directory=/usr/irissys/mgr/traindata
+
+CreateNamespace:Name=DATA,Globals=TRAINDATA,Routines=TRAINDATA

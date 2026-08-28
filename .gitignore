@@ -1,0 +1,6 @@
+# Local overrides - IRIS_KEY_DIR points at a machine-specific path.
+.env
+
+# Licence keys must never be committed.
+*.key
+keys/

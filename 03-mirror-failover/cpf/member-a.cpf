@@ -1,0 +1,23 @@
+; CPF merge for mirror member A of stack 3 - the instance that will become the
+; first failover member, and therefore the initial primary.
+;
+; Prepared here:
+;   - SuperUser is logon-ready
+;   - MIRRORDATA database exists, journalled, ready to be added to the mirror
+;   - MIRRORNS namespace over it, so data can be written and later checked on the
+;     other member
+;
+; Deliberately NOT prepared - this is the exercise (see ../EXERCISE.md):
+;   - %Service_Mirror is left disabled. It is off by default, and enabling it is
+;     the first step of setting up a mirror.
+;   - no mirror set exists
+;
+; ISCAgent needs no preparation: iris-main starts it automatically (its --ISCAgent
+; argument defaults to true) and it listens on 2188 in every container.
+
+[Actions]
+ModifyUser:Name=SuperUser,ChangePassword=0
+
+CreateDatabase:Name=MIRRORDATA,Directory=/usr/irissys/mgr/mirrordata
+
+CreateNamespace:Name=MIRRORNS,Globals=MIRRORDATA,Routines=MIRRORDATA

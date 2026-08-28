@@ -1,0 +1,141 @@
+# Stack 2 - two instances with split roles: code on one, data on the other.
+#
+# Target architecture: classes, routines and utilities live on the "code" instance
+# and stay there; the data they operate on lives on the "data" instance and is
+# reached over ECP. In IRIS terms the TRAINING namespace on "code" keeps its
+# routines database local and takes its globals database from "data".
+#
+# The stack comes up with both instances licensed, both portals working and the
+# databases in place, but NOT connected: wiring ECP is the exercise. See
+# EXERCISE.md, and setup/ for the scripted equivalent.
+#
+# Start:  docker compose up -d
+# Portal: http://localhost:62773/csp/sys/UtilHome.csp   (code, SuperUser / SYS)
+#         http://localhost:62774/csp/sys/UtilHome.csp   (data)
+
+name: iris-training-ecp
+
+services:
+  # ---------------------------------------------------------------- data server
+  data:
+    image: containers.intersystems.com/intersystems/iris:2026.1
+    container_name: training-ecp-data
+    restart: unless-stopped
+    entrypoint: ["/tini", "--", "/irisdev/common/start.sh"]
+    environment:
+      ISC_CPF_MERGE_FILE: /irisdev/cpf/data.cpf
+    ports:
+      - "62973:1972"
+    volumes:
+      - ../common:/irisdev/common:ro
+      - ./cpf:/irisdev/cpf:ro
+      - ${IRIS_KEY_DIR:-../../../keys}:/irisdev/keys:ro
+      - data_data:/usr/irissys/mgr
+    healthcheck:
+      test: ["CMD", "/irisHealth.sh"]
+      interval: 10s
+      timeout: 10s
+      start_period: 30s
+      retries: 18
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------- application server
+  code:
+    image: containers.intersystems.com/intersystems/iris:2026.1
+    container_name: training-ecp-code
+    restart: unless-stopped
+    entrypoint: ["/tini", "--", "/irisdev/common/start.sh"]
+    environment:
+      ISC_CPF_MERGE_FILE: /irisdev/cpf/code.cpf
+    # Only an ordering convenience. The ECP connection is created by hand during
+    # the exercise, so this instance does not actually need the data server to be
+    # up in order to start.
+    depends_on:
+      data:
+        condition: service_healthy
+    ports:
+      - "62972:1972"
+    volumes:
+      - ../common:/irisdev/common:ro
+      - ./cpf:/irisdev/cpf:ro
+      - ${IRIS_KEY_DIR:-../../../keys}:/irisdev/keys:ro
+      - code_data:/usr/irissys/mgr
+    healthcheck:
+      test: ["CMD", "/irisHealth.sh"]
+      interval: 10s
+      timeout: 10s
+      start_period: 30s
+      retries: 18
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # -------------------------------------------------------------------- portals
+  # One gateway per instance. A single gateway can serve several instances, but
+  # only by application path, and the Management Portal emits absolute /csp/sys/
+  # links - so path-based multiplexing breaks portal navigation.
+  code-portal:
+    image: containers.intersystems.com/intersystems/webgateway:2026.1
+    container_name: training-ecp-code-portal
+    restart: unless-stopped
+    depends_on:
+      code:
+        condition: service_healthy
+    environment:
+      ISC_CSP_CONF_FILE: /webgateway-shared/CSP.conf
+      ISC_CSP_INI_FILE: /webgateway-shared/CSP.ini
+    ports:
+      - "62773:80"
+    volumes:
+      - ../common/webgateway/CSP.conf:/webgateway-shared/CSP.conf:ro
+      - ./webgateway/code-CSP.ini:/webgateway-shared/CSP.ini:ro
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  data-portal:
+    image: containers.intersystems.com/intersystems/webgateway:2026.1
+    container_name: training-ecp-data-portal
+    restart: unless-stopped
+    depends_on:
+      data:
+        condition: service_healthy
+    environment:
+      ISC_CSP_CONF_FILE: /webgateway-shared/CSP.conf
+      ISC_CSP_INI_FILE: /webgateway-shared/CSP.ini
+    ports:
+      - "62774:80"
+    volumes:
+      - ../common/webgateway/CSP.conf:/webgateway-shared/CSP.conf:ro
+      - ./webgateway/data-CSP.ini:/webgateway-shared/CSP.ini:ro
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  data_data:
+    driver: local
+  code_data:
+    driver: local
+
+networks:
+  training:
+    driver: bridge

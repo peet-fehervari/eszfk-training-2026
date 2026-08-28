@@ -1,0 +1,18 @@
+három különöző docker compose -t szeretnék:
+
+iris.key rendelkezésre fog állni, nem community version-t használunk.
+a kulcsot egy megadott helyről lehet elérni. nézhetsz péld a workspaces/java-iris-transactions projektből is a kulcs kezelésére
+
+verzió: 2026.1
+
+kell webgateway is
+
+- egy instance sima Iris 4 health
+
+- két instance, szerepek: alkalmazaás + db
+
+- két instance, szerepek: mirrior / failover
+
+
+
+

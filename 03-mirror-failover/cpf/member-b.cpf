@@ -1,0 +1,19 @@
+; CPF merge for mirror member B of stack 3 - the instance that joins the mirror as
+; the second failover member, and therefore starts as the backup.
+;
+; The same database and namespace are created here as on member A, both empty. The
+; backup then adds its copy to the mirror and catches up from the primary. Because
+; both copies are empty at that point there is nothing to restore, which is what
+; makes this exercise quick - a real mirror is normally seeded from a backup of the
+; primary.
+;
+; Deliberately NOT prepared - this is the exercise:
+;   - %Service_Mirror is left disabled
+;   - this member has not joined any mirror
+
+[Actions]
+ModifyUser:Name=SuperUser,ChangePassword=0
+
+CreateDatabase:Name=MIRRORDATA,Directory=/usr/irissys/mgr/mirrordata
+
+CreateNamespace:Name=MIRRORNS,Globals=MIRRORDATA,Routines=MIRRORDATA

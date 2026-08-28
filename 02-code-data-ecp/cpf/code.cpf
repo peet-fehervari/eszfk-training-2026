@@ -1,0 +1,26 @@
+; CPF merge for the CODE instance of stack 2 - the instance that owns the code,
+; classes and utilities.
+;
+; Prepared here:
+;   - SuperUser is logon-ready
+;   - TRAINCODE database exists: this stays local and holds the classes and
+;     routines for the whole exercise
+;   - TRAINING namespace exists with BOTH its routines and its globals pointing at
+;     the local TRAINCODE database
+;
+; The starting state is deliberately "everything local". The exercise moves only
+; the globals (the data) onto the DATA instance over ECP, leaving the routines
+; local - which is exactly the target architecture: code and utilities on this
+; instance, the data they operate on somewhere else.
+;
+; Deliberately NOT prepared - this is the exercise (see ../EXERCISE.md):
+;   - no ECP server definition pointing at the data instance
+;   - no remote database
+;   - TRAINING globals are still local
+
+[Actions]
+ModifyUser:Name=SuperUser,ChangePassword=0
+
+CreateDatabase:Name=TRAINCODE,Directory=/usr/irissys/mgr/traincode
+
+CreateNamespace:Name=TRAINING,Globals=TRAINCODE,Routines=TRAINCODE

@@ -1,0 +1,149 @@
+# Stack 3 - a two-member mirror: one primary, one backup, no arbiter.
+#
+# Two failover members exactly as the specification asks. Because there is no
+# arbiter, a member that loses contact with its partner cannot tell "the partner is
+# dead" from "the network is broken", so it will not promote itself. Takeover is
+# therefore a deliberate manual operation - which is the interesting part of this
+# stack, not a limitation to work around.
+#
+# There is also no virtual IP: a mirror VIP requires the members to share a subnet
+# where an interface can be moved between them, which a Docker bridge network does
+# not provide. Clients here connect to a member directly, or through that member's
+# own Web Gateway.
+#
+# The stack comes up prepared but with no mirror configured: creating it is the
+# exercise. See EXERCISE.md, and setup/ for the scripted equivalent.
+#
+# Start:  docker compose up -d
+# Portal: http://localhost:63773/csp/sys/UtilHome.csp   (member A, SuperUser / SYS)
+#         http://localhost:63774/csp/sys/UtilHome.csp   (member B)
+
+name: iris-training-mirror
+
+services:
+  mirror-a:
+    image: containers.intersystems.com/intersystems/iris:2026.1
+    container_name: training-mirror-a
+    hostname: mirror-a
+    restart: unless-stopped
+    entrypoint: ["/tini", "--", "/irisdev/common/start.sh"]
+    environment:
+      ISC_CPF_MERGE_FILE: /irisdev/cpf/member-a.cpf
+    ports:
+      - "63972:1972"
+      # ISCAgent. Members reach each other's agent over the stack network, so
+      # publishing is not required for the mirror to work; it is here so the agent
+      # can be probed from the host while diagnosing.
+      - "63188:2188"
+    volumes:
+      - ../common:/irisdev/common:ro
+      - ./cpf:/irisdev/cpf:ro
+      - ${IRIS_KEY_DIR:-../../../keys}:/irisdev/keys:ro
+      - mirror_a_data:/usr/irissys/mgr
+    healthcheck:
+      test: ["CMD", "/irisHealth.sh"]
+      interval: 10s
+      timeout: 10s
+      start_period: 30s
+      retries: 18
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  mirror-b:
+    image: containers.intersystems.com/intersystems/iris:2026.1
+    container_name: training-mirror-b
+    hostname: mirror-b
+    restart: unless-stopped
+    entrypoint: ["/tini", "--", "/irisdev/common/start.sh"]
+    environment:
+      ISC_CPF_MERGE_FILE: /irisdev/cpf/member-b.cpf
+    # Ordering only. Member B must be able to reach member A's ISCAgent at the
+    # moment it joins, but that happens later, by hand.
+    depends_on:
+      mirror-a:
+        condition: service_healthy
+    ports:
+      - "63973:1972"
+      - "63189:2188"
+    volumes:
+      - ../common:/irisdev/common:ro
+      - ./cpf:/irisdev/cpf:ro
+      - ${IRIS_KEY_DIR:-../../../keys}:/irisdev/keys:ro
+      - mirror_b_data:/usr/irissys/mgr
+    healthcheck:
+      test: ["CMD", "/irisHealth.sh"]
+      interval: 10s
+      timeout: 10s
+      start_period: 30s
+      retries: 18
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # One gateway per member. Each portal shows the mirror from that member's own
+  # point of view, which is what makes a failover visible: the same monitor page on
+  # the two members reports different roles.
+  mirror-a-portal:
+    image: containers.intersystems.com/intersystems/webgateway:2026.1
+    container_name: training-mirror-a-portal
+    restart: unless-stopped
+    depends_on:
+      mirror-a:
+        condition: service_healthy
+    environment:
+      ISC_CSP_CONF_FILE: /webgateway-shared/CSP.conf
+      ISC_CSP_INI_FILE: /webgateway-shared/CSP.ini
+    ports:
+      - "63773:80"
+    volumes:
+      - ../common/webgateway/CSP.conf:/webgateway-shared/CSP.conf:ro
+      - ./webgateway/member-a-CSP.ini:/webgateway-shared/CSP.ini:ro
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  mirror-b-portal:
+    image: containers.intersystems.com/intersystems/webgateway:2026.1
+    container_name: training-mirror-b-portal
+    restart: unless-stopped
+    depends_on:
+      mirror-b:
+        condition: service_healthy
+    environment:
+      ISC_CSP_CONF_FILE: /webgateway-shared/CSP.conf
+      ISC_CSP_INI_FILE: /webgateway-shared/CSP.ini
+    ports:
+      - "63774:80"
+    volumes:
+      - ../common/webgateway/CSP.conf:/webgateway-shared/CSP.conf:ro
+      - ./webgateway/member-b-CSP.ini:/webgateway-shared/CSP.ini:ro
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mirror_a_data:
+    driver: local
+  mirror_b_data:
+    driver: local
+
+networks:
+  training:
+    driver: bridge

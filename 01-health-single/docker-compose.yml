@@ -1,0 +1,91 @@
+# Stack 1 - a single licensed IRIS for Health instance with a working portal.
+#
+# Nothing health-specific is configured: this is a clean, licensed IRIS for Health
+# to explore. The FHIR repository and interoperability namespaces are left for the
+# session to create.
+#
+# Start:  docker compose up -d
+# Portal: http://localhost:61773/csp/sys/UtilHome.csp   (SuperUser / SYS)
+# Stop:   docker compose down          (add -v to discard the instance data)
+
+name: iris-training-health
+
+services:
+  health:
+    image: containers.intersystems.com/intersystems/irishealth:2026.1
+    container_name: training-health
+    restart: unless-stopped
+
+    # The image's own entrypoint is "/tini -- /iris-main". tini must stay in
+    # front so signals reach IRIS and it shuts down cleanly; start.sh only adds
+    # the licence key argument and then execs iris-main.
+    entrypoint: ["/tini", "--", "/irisdev/common/start.sh"]
+
+    environment:
+      ISC_CPF_MERGE_FILE: /irisdev/common/merge-base.cpf
+
+    ports:
+      # Superserver (JDBC, ODBC, ECP, iris session over TCP).
+      - "61972:1972"
+      # No 52773 here on purpose: the licensed image ships no private web server
+      # (WebServer=0, no httpd), so the portal comes from the gateway below.
+
+    volumes:
+      - ../common:/irisdev/common:ro
+      # Licence key store, read-only, never part of this repository. The default
+      # is the shared workspace key store: three levels up from this stack
+      # directory (stack -> repository root -> parent -> workspace). Override with
+      # IRIS_KEY_DIR if the keys live elsewhere - see .env.example.
+      - ${IRIS_KEY_DIR:-../../../keys}:/irisdev/keys:ro
+      - health_data:/usr/irissys/mgr
+
+    healthcheck:
+      # The image ships its own probe. Its built-in healthcheck only polls every
+      # 60s with a 60s start period, which makes dependent containers wait far
+      # longer than necessary, so the same script is reused on a tighter schedule.
+      test: ["CMD", "/irisHealth.sh"]
+      interval: 10s
+      timeout: 10s
+      start_period: 30s
+      retries: 18
+
+    networks:
+      - training
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Without this container there is no Management Portal at all.
+  portal:
+    image: containers.intersystems.com/intersystems/webgateway:2026.1
+    container_name: training-health-portal
+    restart: unless-stopped
+    depends_on:
+      health:
+        condition: service_healthy
+    environment:
+      ISC_CSP_CONF_FILE: /webgateway-shared/CSP.conf
+      ISC_CSP_INI_FILE: /webgateway-shared/CSP.ini
+    ports:
+      - "61773:80"
+    volumes:
+      - ../common/webgateway/CSP.conf:/webgateway-shared/CSP.conf:ro
+      - ./webgateway/CSP.ini:/webgateway-shared/CSP.ini:ro
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  health_data:
+    driver: local
+
+networks:
+  training:
+    driver: bridge

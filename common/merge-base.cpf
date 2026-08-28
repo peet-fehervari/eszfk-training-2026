@@ -1,0 +1,16 @@
+; Base CPF merge, applied to every instance in every stack via ISC_CPF_MERGE_FILE.
+; Re-applied on every container start, and idempotent.
+;
+; Stacks that need their own databases or namespaces do not include this file
+; directly: they have their own merge file which repeats the [Actions] line below
+; and adds CreateDatabase / CreateNamespace actions. IRIS accepts only one merge
+; file, so there is nothing to include from.
+
+[Actions]
+; A fresh instance has SuperUser flagged "password change required", which makes
+; the first login - portal, JDBC or iris session - fail with a forced interactive
+; change. Verified on 2026.1: SuperUser has ChangePassword=1 out of the box.
+;
+; CSPSystem, the account the Web Gateway logs in with, is already ChangePassword=0
+; on 2026.1 and therefore needs no line here. Older projects still set it.
+ModifyUser:Name=SuperUser,ChangePassword=0
