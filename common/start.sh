@@ -20,9 +20,39 @@
 #   -a <command>   The post-start hook. These stacks are configured by hand as
 #                  part of the training exercise, so nothing runs automatically.
 #                  See the stack EXERCISE.md files.
+#
+# One optional extra job, used only by the sysadmin-course stack: seed a writable
+# working directory from a read-only mount. Both paths come from the environment
+# and nothing happens unless COURSE_MATERIAL_SRC is set, so the other stacks are
+# unaffected.
 set -u
 
 KEY_ROOT=${IRIS_KEY_ROOT:-/irisdev/keys}
+
+MATERIAL_SRC=${COURSE_MATERIAL_SRC:-}
+MATERIAL_DEST=${COURSE_MATERIAL_DEST:-}
+if [ -n "$MATERIAL_SRC" ] && [ -n "$MATERIAL_DEST" ] && [ -d "$MATERIAL_SRC" ]; then
+    # README.md is the placement instructions committed to the source directory, not
+    # material. Ignoring it on both sides matters: an instance started before the
+    # material was dropped in must still seed itself on the next restart, and it
+    # would not if a lone copied README counted as "already populated".
+    src_files=$(find "$MATERIAL_SRC" -mindepth 1 -not -name README.md -print -quit 2>/dev/null)
+    dest_files=$(find "$MATERIAL_DEST" -mindepth 1 -not -name README.md -print -quit 2>/dev/null)
+    if [ -z "$src_files" ]; then
+        echo "iris-init: WARNING - $MATERIAL_SRC is empty, nothing to seed"
+        echo "iris-init: the course exercises need the student files there first."
+        echo "iris-init: See the instructions in that directory's README.md."
+    elif [ -n "$dest_files" ]; then
+        echo "iris-init: $MATERIAL_DEST already populated, left alone"
+    else
+        # The exercises write into the destination (^%GO exports, %ZSTOP's ss.txt),
+        # so a restart must not overwrite the participant's own work.
+        echo "iris-init: seeding $MATERIAL_DEST from $MATERIAL_SRC"
+        find "$MATERIAL_SRC" -mindepth 1 -maxdepth 1 -not -name README.md \
+            -exec cp -r {} "$MATERIAL_DEST"/ \; 2>&1 ||
+            echo "iris-init: WARNING - seeding failed"
+    fi
+fi
 
 ARGS=()
 

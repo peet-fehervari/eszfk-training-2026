@@ -4,3 +4,20 @@
 # Licence keys must never be committed.
 *.key
 keys/
+
+# The course student files are licensed InterSystems content, distributed to
+# participants separately. Nothing under here is committed - where they go is
+# documented in common/course/PREREQUISITES.md.
+common/course/material/
+
+# The course exercise text itself is licensed material too, and is distributed to
+# participants separately. Keep it out of the repository entirely.
+Exercises.*
+
+# Local working files: the agent guidance file and the original requirement note.
+# Both are authoring aids for this machine, not part of what the stacks deliver.
+CLAUDE.md
+spec.txt
+
+# Local test leftovers.
+04-sysadmin-course/

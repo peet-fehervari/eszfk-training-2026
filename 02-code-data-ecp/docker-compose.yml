@@ -29,7 +29,7 @@ services:
     volumes:
       - ../common:/irisdev/common:ro
       - ./cpf:/irisdev/cpf:ro
-      - ${IRIS_KEY_DIR:-../../../keys}:/irisdev/keys:ro
+      - ${IRIS_KEY_DIR:-../keys}:/irisdev/keys:ro
       - data_data:/usr/irissys/mgr
     healthcheck:
       test: ["CMD", "/irisHealth.sh"]
@@ -64,7 +64,7 @@ services:
     volumes:
       - ../common:/irisdev/common:ro
       - ./cpf:/irisdev/cpf:ro
-      - ${IRIS_KEY_DIR:-../../../keys}:/irisdev/keys:ro
+      - ${IRIS_KEY_DIR:-../keys}:/irisdev/keys:ro
       - code_data:/usr/irissys/mgr
     healthcheck:
       test: ["CMD", "/irisHealth.sh"]

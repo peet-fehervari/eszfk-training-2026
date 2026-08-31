@@ -1,0 +1,4 @@
+# Report output from ^SystemPerformance and the Diagnostic Report lands here.
+# Contents are per-run artefacts, not part of the repository.
+*
+!.gitignore

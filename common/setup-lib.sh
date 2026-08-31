@@ -29,10 +29,16 @@ need_running() {
 # Steps report their outcome as "<label>=1" or "<label>=0"; treat any 0 as fatal so
 # a half-configured stack is not reported as success. IRIS itself exits 0 even when
 # a method returns an error status, so the exit code cannot be relied on.
+#
+# A step marker is a whole line and nothing else: label, "=", one digit. Anchoring
+# both ends matters - %Installer's own progress log ends lines with text like
+# "(isdir=0) into PHONEBOOK, recurse=0", which a bare '=0$' match reads as a failed
+# step and turns a successful install into a reported failure.
+STEP_MARKER='^[A-Za-z][A-Za-z0-9_.-]*=[0-9]$'
 check_steps() {
     local output=$1
-    if echo "$output" | grep -q '=0$'; then
-        echo "$output" | grep '=0$' | sed 's/^/  FAILED: /' >&2
+    if echo "$output" | grep -E "$STEP_MARKER" | grep -q '=0$'; then
+        echo "$output" | grep -E "$STEP_MARKER" | grep '=0$' | sed 's/^/  FAILED: /' >&2
         return 1
     fi
     return 0

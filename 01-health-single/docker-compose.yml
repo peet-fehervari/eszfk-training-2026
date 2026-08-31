@@ -32,11 +32,10 @@ services:
 
     volumes:
       - ../common:/irisdev/common:ro
-      # Licence key store, read-only, never part of this repository. The default
-      # is the shared workspace key store: three levels up from this stack
-      # directory (stack -> repository root -> parent -> workspace). Override with
-      # IRIS_KEY_DIR if the keys live elsewhere - see .env.example.
-      - ${IRIS_KEY_DIR:-../../../keys}:/irisdev/keys:ro
+      # Licence key store, read-only. Default: the repository's own keys/ directory,
+      # which is gitignored - put the key in keys/2026/iris.key. Override with
+      # IRIS_KEY_DIR if it lives elsewhere - see .env.example.
+      - ${IRIS_KEY_DIR:-../keys}:/irisdev/keys:ro
       - health_data:/usr/irissys/mgr
 
     healthcheck:
