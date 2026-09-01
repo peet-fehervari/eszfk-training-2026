@@ -40,6 +40,22 @@ Expected: a line naming the key file, then `LMF Info: Licensed for 128 cores`.
 If instead `iris-init: WARNING - no *.key found` appears, see the repository README
 for the key store layout.
 
+## For the "Managing InterSystems Servers" course
+
+This is the stack to use for it, except for the ECP and mirroring modules (stacks 2 and 3).
+Start it as above, then:
+
+```bash
+cd ../common/course
+./prepare-instance.sh training-health       # the whole installation
+./install-phonebook.sh training-health      # optional; installs the Phonebook application
+```
+
+See [common/course/README.md](../common/course/README.md). The exercise directories
+(`/Management`, `/databases`, `/backups`, `/journals`) are already volumes in this stack's
+compose file, so only their ownership and the OS accounts have to be set up - which is what
+`prepare-instance.sh` does, and what has to be re-run after a container recreate.
+
 ## Notes
 
 - The licence used here is an **IRIS Advanced Server** key. It was verified to

@@ -22,17 +22,11 @@ disagree about who is primary - which is how the role change becomes visible.
 ```bash
 docker compose up -d
 docker compose logs mirror-a | grep -i "LMF Info"   # must show a licensed instance
-setup/verify.sh                                     # read-only, safe at any stage
 ```
 
-Scripted equivalent of the exercise:
-
-```bash
-setup/01-create-mirror.sh    # member A: enable service, create TRAINMIRROR, add DB
-setup/02-join-mirror.sh      # member B: enable service, join as MEMBERB
-setup/verify.sh
-setup/takeover.sh            # stop member A, promote member B
-```
+There are no scripts here: building the mirror is the exercise, done in the portal on
+both members. [EXERCISE.md](EXERCISE.md) has the steps, and the ObjectScript one-liners
+to check the roles from a session on either member.
 
 Reset to a clean, unconfigured state:
 
@@ -58,7 +52,8 @@ member has joined anything.
 **No arbiter** because the specification asks for two failover members. The
 consequence is the interesting part: a member that loses contact with its partner
 cannot distinguish a dead partner from a broken network, so it never promotes itself.
-Takeover is an operator decision - `setup/takeover.sh`.
+Takeover is an operator decision, made in the portal on member B (or with
+`SYS.Mirror.BecomePrimary()`) after member A has been stopped.
 
 **No virtual IP** because a mirror VIP requires the members to share a subnet on which
 an interface can be moved from one host to the other. A Docker bridge network does not

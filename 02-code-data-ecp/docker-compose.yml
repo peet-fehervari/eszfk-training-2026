@@ -7,11 +7,16 @@
 #
 # The stack comes up with both instances licensed, both portals working and the
 # databases in place, but NOT connected: wiring ECP is the exercise. See
-# EXERCISE.md, and setup/ for the scripted equivalent.
+# EXERCISE.md.
 #
 # Start:  docker compose up -d
 # Portal: http://localhost:62773/csp/sys/UtilHome.csp   (code, SuperUser / SYS)
 #         http://localhost:62774/csp/sys/UtilHome.csp   (data)
+#
+# Both instances also carry the course exercise directories (/Management, /databases,
+# /backups, /journals) as volumes, so this stack can be used for the course's ECP
+# module - the participant works on both machines. Run
+# ../common/course/prepare-instance.sh against both containers once after a recreate.
 
 name: iris-training-ecp
 
@@ -24,13 +29,43 @@ services:
     entrypoint: ["/tini", "--", "/irisdev/common/start.sh"]
     environment:
       ISC_CPF_MERGE_FILE: /irisdev/cpf/data.cpf
+    # Published ports are .env overrides with the documented default, because Windows
+    # reserves blocks of high ports for its own NAT and a reserved one cannot be
+    # published at all - Compose then fails with "/forwards/expose returned unexpected
+    # status: 500". See 01-health-single/docker-compose.yml for the whole note.
     ports:
-      - "62973:1972"
+      - "${PORT_DATA_SUPERSERVER:-62973}:1972"
+    # Pinned to two cores. IRIS checks the licence against the number of cores it can
+    # see, and on a host with more cores than the key allows it falls back to a minimal
+    # licence almost silently - which only surfaces much later as missing
+    # Interoperability or an HTTP 503. Pinning also stops five training instances from
+    # fighting over one laptop. Override with IRIS_CPUS in the stack's .env.
+    deploy:
+      resources:
+        limits:
+          cpus: '${IRIS_CPUS:-2.0}'
+        reservations:
+          cpus: '${IRIS_CPUS:-2.0}'
     volumes:
       - ../common:/irisdev/common:ro
       - ./cpf:/irisdev/cpf:ro
       - ${IRIS_KEY_DIR:-../keys}:/irisdev/keys:ro
-      - data_data:/usr/irissys/mgr
+      # The whole instance directory, not just mgr/ inside it. iris.cpf lives in
+      # /usr/irissys, so with only mgr/ in the volume every namespace, database and
+      # mapping a participant creates is gone as soon as the container is recreated -
+      # a `docker compose down` and `up`, or any edit to this file. Measured on 2026.1.
+      # With /usr/irissys in the volume a recreate keeps the configuration and only
+      # `down -v` resets the stack. Costs about 1.5 GB of volume per instance.
+      - data_data:/usr/irissys
+      # The course exercise directories, at the paths the exercise text uses. They are
+      # outside /usr/irissys, so without these volumes a recreate would take the student
+      # files, the backups and the journals with it. Docker creates each mount point
+      # root-owned, so prepare-instance.sh chowns them to the IRIS user.
+      - data_management:/Management
+      - data_databases:/databases
+      - data_backups:/backups
+      - data_journals:/journals
+      - data_encryption:/InterSystems
     healthcheck:
       test: ["CMD", "/irisHealth.sh"]
       interval: 10s
@@ -60,12 +95,26 @@ services:
       data:
         condition: service_healthy
     ports:
-      - "62972:1972"
+      - "${PORT_CODE_SUPERSERVER:-62972}:1972"
+    # See the data service above for why the cores are pinned.
+    deploy:
+      resources:
+        limits:
+          cpus: '${IRIS_CPUS:-2.0}'
+        reservations:
+          cpus: '${IRIS_CPUS:-2.0}'
     volumes:
       - ../common:/irisdev/common:ro
       - ./cpf:/irisdev/cpf:ro
       - ${IRIS_KEY_DIR:-../keys}:/irisdev/keys:ro
-      - code_data:/usr/irissys/mgr
+      # /usr/irissys, not /usr/irissys/mgr - see the data service above.
+      - code_data:/usr/irissys
+      # Course exercise directories - see the data service above.
+      - code_management:/Management
+      - code_databases:/databases
+      - code_backups:/backups
+      - code_journals:/journals
+      - code_encryption:/InterSystems
     healthcheck:
       test: ["CMD", "/irisHealth.sh"]
       interval: 10s
@@ -95,7 +144,7 @@ services:
       ISC_CSP_CONF_FILE: /webgateway-shared/CSP.conf
       ISC_CSP_INI_FILE: /webgateway-shared/CSP.ini
     ports:
-      - "62773:80"
+      - "${PORT_CODE_PORTAL:-62773}:80"
     volumes:
       - ../common/webgateway/CSP.conf:/webgateway-shared/CSP.conf:ro
       - ./webgateway/code-CSP.ini:/webgateway-shared/CSP.ini:ro
@@ -118,10 +167,35 @@ services:
       ISC_CSP_CONF_FILE: /webgateway-shared/CSP.conf
       ISC_CSP_INI_FILE: /webgateway-shared/CSP.ini
     ports:
-      - "62774:80"
+      - "${PORT_DATA_PORTAL:-62774}:80"
     volumes:
       - ../common/webgateway/CSP.conf:/webgateway-shared/CSP.conf:ro
       - ./webgateway/data-CSP.ini:/webgateway-shared/CSP.ini:ro
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Mail server for the course's notification exercises (^MONMGR, Task Manager,
+  # two-factor). In IRIS, use host "mail" and port 1025; the inbox is on the host at
+  # http://localhost:61026. Not started by default - Docker Hub is not always reachable,
+  # and a failed pull in the default service set would take IRIS down with it:
+  #
+  #   docker compose --profile mail up -d
+  #
+  # The container name and ports are the same in all three stacks, so only one stack can
+  # run the mail server at a time. That is enough: the course is done in one stack.
+  mail:
+    image: ${MAILHOG_IMAGE:-mailhog/mailhog:latest}
+    container_name: course-mail
+    profiles: ["mail"]
+    restart: unless-stopped
+    ports:
+      - "${PORT_MAIL_SMTP:-61025}:1025"
+      - "${PORT_MAIL_UI:-61026}:8025"
     networks:
       - training
     logging:
@@ -135,6 +209,16 @@ volumes:
     driver: local
   code_data:
     driver: local
+  data_management:
+  data_databases:
+  data_backups:
+  data_journals:
+  data_encryption:
+  code_management:
+  code_databases:
+  code_backups:
+  code_journals:
+  code_encryption:
 
 networks:
   training:

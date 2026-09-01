@@ -46,21 +46,27 @@ Each stack is its own Compose project, so they can run at the same time or one a
 5. Open the portal and log in as `SuperUser` / `SYS`:
    <http://localhost:61773/csp/sys/UtilHome.csp>
 
-For the course exercises, two more steps - the details are in
-[common/course/README.md](common/course/README.md):
+For the "Managing InterSystems Servers" course, two more steps - the file list and what the
+script does are in [common/course/README.md](common/course/README.md):
 
 6. Copy the course student files into `common/course/material/` (licensed material, handed
-   out separately - the file list is in
-   [common/course/PREREQUISITES.md](common/course/PREREQUISITES.md)).
+   out separately).
 
-7. Prepare the running instance and check it:
+7. Prepare the running instance:
 
    ```bash
    cd ../common/course
    ./prepare-instance.sh training-health      # directories, OS accounts, student files
-   ./install-phonebook.sh training-health     # the Phonebook application
-   ./verify.sh training-health 61773          # expect: No failures
    ```
+
+   Re-run it at any time to check or repair the same things; it is idempotent, so there is
+   no separate check script. `./install-phonebook.sh training-health` is optional and is the
+   one script that does exercise work - it installs the Phonebook application instead of the
+   participant, letting the exercises start at the "Applications" module.
+
+   On Windows the same scripts are there as `.ps1`, taking the same arguments.
+   [common/course/COURSE-NOTES.md](common/course/COURSE-NOTES.md) then lists, module by
+   module, every place where this environment differs from the printed exercise notes.
 
 ## Ports
 
@@ -72,9 +78,20 @@ For the course exercises, two more steps - the details are in
 | 3 | member A | 63972 | 63773 | 63188 |
 | 3 | member B | 63973 | 63774 | 63189 |
 
-The course overlay adds the mail server on 61025 (SMTP) and 61026 (inbox), and stack 3's
-arbiter on 63190. Every port is a `.env` override, because on a Windows host WinNAT
-reserves blocks of high ports and a reserved port cannot be published at all.
+Two optional containers, started only with their profile, add the mail server on 61025
+(SMTP) and 61026 (inbox) and stack 3's arbiter on 63190:
+
+```bash
+docker compose --profile mail up -d        # any stack: MailHog for the mail exercises
+docker compose --profile arbiter up -d     # stack 3 only
+```
+
+Every port is a `.env` override, because on a Windows host WinNAT reserves blocks of high
+ports, dynamically and differently after each reboot, and a reserved port cannot be
+published at all - Compose then fails with `/forwards/expose returned unexpected status:
+500` and nothing is listening, which looks like a Docker fault rather than a port
+conflict. List the reserved blocks with
+`netsh int ipv4 show excludedportrange tcp` and move the port in the stack's `.env`.
 
 Inside the containers everything stays on the native ports (1972, 2188, 80), so
 container-to-container configuration uses service names: `data:1972`, `mirror-a:2188`.

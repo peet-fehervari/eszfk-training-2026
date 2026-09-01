@@ -2,11 +2,16 @@
 # Scripted equivalent of the course's "Applications" module: install the Phonebook
 # application and the MIS.Simulation helper class.
 #
-# The course has the participant do this by hand (import the %Installer class in
-# the portal, then call RunInstall from Terminal). Run this to prepare a demo
-# instance, to reset one, or to get the later modules working without replaying
-# the earlier ones - backup, journalling, ECP, mirroring and every authorization
-# module operate on the databases this creates.
+# THIS SCRIPT DOES EXERCISE WORK, and it is the only one that does - which is why it is
+# separate from prepare-instance.sh and optional. The %Installer it runs creates the
+# databases, the PHONEBOOK namespace, the global mappings and the CSP applications that
+# the "Configuration for the Application" and "Applications" modules have the participant
+# create by hand. Skip it if those modules are to be done properly.
+#
+# Run it when they are not: to prepare a demo instance, or to get the later modules
+# working without replaying the earlier ones - backup, journalling, ECP, mirroring and
+# every authorization module operate on the databases this creates, so a participant who
+# gets stuck in the earlier modules is stuck in all of them.
 #
 # Nothing is hard-coded: every path is a variable with the course's own default.
 #   STUDENT_DIR  where the student files are inside the container
@@ -85,4 +90,6 @@ if [ "$BACKUP_DIR" != "/backups" ]; then
 fi
 
 echo
-echo "Done. Verify with ./verify.sh"
+echo "Done. This instance now has the PHONEBOOK namespace, the COMPANY, CUSTOMER,"
+echo "PERSONAL and PBCODE databases, and the /csp/phonebook and /csp/company"
+echo "applications - so the exercises can be started at the Applications module."

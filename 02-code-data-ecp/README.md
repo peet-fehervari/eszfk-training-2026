@@ -36,20 +36,9 @@ Portals: <http://localhost:62773> (code) and <http://localhost:62774> (data),
 Databases and namespaces are created declaratively by the CPF merge files in
 [cpf/](cpf/), applied on every container start and idempotent.
 
-## Scripts
-
-Run from the `setup/` directory. They exist to reset the environment or to
-demonstrate the finished state - the exercise is to do the same in the portal.
-
-| Script | Does |
-|---|---|
-| `01-data-server.sh` | Enables `%Service_ECP` on the data instance |
-| `02-code-server.sh` | Adds the ECP server, creates the remote database, remaps `TRAINING` globals |
-| `verify.sh` | Proves the split, and refuses if the stack is not wired yet |
-
-`verify.sh` also works after doing the exercise by hand, so it can be used to check
-a participant's own work. Container names can be overridden with the
-`CODE_CONTAINER` and `DATA_CONTAINER` environment variables.
+There are no scripts here. Everything the stack prepares is done by the compose file
+and the CPF merges; the ECP wiring is done by hand in the portal, following
+[EXERCISE.md](EXERCISE.md). To start over, `docker compose down -v` and up again.
 
 ## Notes
 

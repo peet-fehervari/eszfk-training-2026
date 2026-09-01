@@ -1,10 +1,10 @@
-# Helpers for the stacks' setup and verify scripts.
+# Helpers for the host scripts in common/course/.
 #
 # These run on the HOST and reach into containers with docker exec. They are not
 # executed inside a container - common/ is also bind-mounted into the instances,
 # but this file is unused there.
 #
-# Sourced, not executed:  . ../../common/setup-lib.sh
+# Sourced, not executed:  . ../setup-lib.sh
 
 # Run ObjectScript in an instance, one complete command per line on stdin.
 #

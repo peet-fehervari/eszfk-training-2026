@@ -5,8 +5,9 @@ empty `MIRRORDATA` database and a `MIRRORNS` namespace over it. Their ISCAgents 
 already listening on 2188 - `iris-main` starts the agent by default, so there is
 nothing to do for that prerequisite.
 
-Everything below is deliberately left undone. Do it in the portal; `setup/` holds the
-same steps as scripts, for resetting the environment or checking an answer.
+Everything below is deliberately left undone. Do it in the portal - there are no
+scripts for it; doing it is the exercise. To start over, `docker compose down -v` and
+up again.
 
 | Member | Portal | Role after setup |
 |---|---|---|
@@ -68,8 +69,12 @@ With TLS off the joining member registers itself with the primary, so there is
 nothing to approve on member A.
 
 **Observable result:** within a few seconds, member A's monitor shows `MEMBERB` as
-`Backup`/`Active`, and member B's monitor shows the same pair from its own side. Run
-`setup/verify.sh` to see both views next to each other.
+`Backup`/`Active`, and member B's monitor shows the same pair from its own side. From a
+session on either member, the same view in one line:
+
+```
+do ##class(SYS.Mirror).GetFailoverMemberStatus(.t,.o) write $listget(t,1)," ",$listget(t,3)," / ",$listget(o,1)," ",$listget(o,3)
+```
 
 ## 5. Add the database on the backup
 
@@ -79,8 +84,13 @@ reaches it. Adding it is the last step, and it is the fiddly one: see the *Addin
 database on the backup* section of [README.md](README.md) for what is known about it
 and what to expect.
 
-**Observable result to aim for:** `setup/verify.sh` prints a
-`mirrored-db=MIRRORDATA` line for member B as well as for member A.
+**Observable result to aim for:** member B lists `MIRRORDATA` as a mirrored database,
+the same as member A does. In a session on either member:
+
+```
+set r=##class(%ResultSet).%New("Config.Databases:MirrorDatabaseList") do r.Execute("*")
+while r.Next() { write r.GetData(1)," ",r.GetData(3),! }
+```
 
 ## 6. Prove replication
 
@@ -113,10 +123,11 @@ backup**. This is the point of the exercise: with only two members and no arbite
 member B cannot tell "A is dead" from "the network to A is broken", and promoting
 itself on a guess would risk two primaries writing divergent data.
 
-Promote it deliberately - Mirror Monitor > *Become primary*, or:
+Promote it deliberately - Mirror Monitor > *Become primary*, or from a session on
+member B:
 
-```bash
-setup/takeover.sh --force     # member A is already stopped
+```
+set sc=##class(SYS.Mirror).BecomePrimary() write $system.Status.GetErrorText(sc)
 ```
 
 **Observable result:** member B's role becomes `Primary`, and the data written in

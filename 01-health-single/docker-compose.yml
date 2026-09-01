@@ -7,6 +7,11 @@
 # Start:  docker compose up -d
 # Portal: http://localhost:61773/csp/sys/UtilHome.csp   (SuperUser / SYS)
 # Stop:   docker compose down          (add -v to discard the instance data)
+#
+# The exercise directories (/Management, /databases, /backups, /journals) are volumes
+# here, so nothing a participant does is lost by a restart or a recreate. They still
+# have to be given to the IRIS user once per recreate - that is what
+# ../common/course/prepare-instance.sh does.
 
 name: iris-training-health
 
@@ -24,11 +29,30 @@ services:
     environment:
       ISC_CPF_MERGE_FILE: /irisdev/common/merge-base.cpf
 
+    # Every published port is an override with the documented default. Windows reserves
+    # blocks of high ports for its own NAT, dynamically and differently after each
+    # reboot, and a reserved port cannot be published at all: Compose fails with
+    # "/forwards/expose returned unexpected status: 500" and nothing is listening, so it
+    # looks like a Docker fault rather than a port conflict. When that happens, list the
+    # blocks and move the port in this stack's .env - see .env.example.
+    #   netsh int ipv4 show excludedportrange tcp
     ports:
       # Superserver (JDBC, ODBC, ECP, iris session over TCP).
-      - "61972:1972"
+      - "${PORT_HEALTH_SUPERSERVER:-61972}:1972"
       # No 52773 here on purpose: the licensed image ships no private web server
       # (WebServer=0, no httpd), so the portal comes from the gateway below.
+
+    # Pinned to two cores. IRIS checks the licence against the number of cores it can
+    # see, and on a host with more cores than the key allows it falls back to a minimal
+    # licence almost silently - which only surfaces much later as missing
+    # Interoperability or an HTTP 503. Pinning also stops several training instances
+    # from fighting over one laptop. Override with IRIS_CPUS in the stack's .env.
+    deploy:
+      resources:
+        limits:
+          cpus: '${IRIS_CPUS:-2.0}'
+        reservations:
+          cpus: '${IRIS_CPUS:-2.0}'
 
     volumes:
       - ../common:/irisdev/common:ro
@@ -36,7 +60,24 @@ services:
       # which is gitignored - put the key in keys/2026/iris.key. Override with
       # IRIS_KEY_DIR if it lives elsewhere - see .env.example.
       - ${IRIS_KEY_DIR:-../keys}:/irisdev/keys:ro
-      - health_data:/usr/irissys/mgr
+      # The whole instance directory, not just mgr/ inside it. iris.cpf lives in
+      # /usr/irissys, so with only mgr/ in the volume every namespace, database and
+      # mapping a participant creates is gone as soon as the container is recreated -
+      # a `docker compose down` and `up`, or any edit to this file. Measured on 2026.1.
+      # With /usr/irissys in the volume a recreate keeps the configuration and only
+      # `down -v` resets the stack. Costs about 1.5 GB of volume per instance.
+      - health_data:/usr/irissys
+      # The directories the exercises type, at the paths the exercise text uses. They
+      # are outside /usr/irissys, so without these volumes they would live in the
+      # container's writable layer and a recreate would take the student files, the
+      # backups and the journals with it. Docker creates each mount point root-owned
+      # (the path does not exist in the image), so prepare-instance.sh chowns them to
+      # the IRIS user - the volumes alone are not usable.
+      - course_management:/Management
+      - course_databases:/databases
+      - course_backups:/backups
+      - course_journals:/journals
+      - course_encryption:/InterSystems
 
     healthcheck:
       # The image ships its own probe. Its built-in healthcheck only polls every
@@ -69,7 +110,7 @@ services:
       ISC_CSP_CONF_FILE: /webgateway-shared/CSP.conf
       ISC_CSP_INI_FILE: /webgateway-shared/CSP.ini
     ports:
-      - "61773:80"
+      - "${PORT_HEALTH_PORTAL:-61773}:80"
     volumes:
       - ../common/webgateway/CSP.conf:/webgateway-shared/CSP.conf:ro
       - ./webgateway/CSP.ini:/webgateway-shared/CSP.ini:ro
@@ -81,9 +122,42 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Mail server for the exercises that send notifications (^MONMGR, Task Manager,
+  # two-factor authentication). Same idea as MailSlurper on a Windows desktop: SMTP in
+  # on 1025, a browser inbox on 8025. In IRIS, use host "mail" and port 1025.
+  #
+  # Not started by default. It is the one image not from containers.intersystems.com,
+  # and where Docker Hub is unreachable the pull fails - in the default service set that
+  # failure would take the IRIS instance down with it. Everything except the
+  # notification exercises works without it:
+  #
+  #   docker compose --profile mail up -d
+  mail:
+    image: ${MAILHOG_IMAGE:-mailhog/mailhog:latest}
+    container_name: course-mail
+    profiles: ["mail"]
+    restart: unless-stopped
+    ports:
+      # 61080 is deliberately not used for the inbox: it falls inside a WinNAT-reserved
+      # block on the machine this was built on. See the note on ports above.
+      - "${PORT_MAIL_SMTP:-61025}:1025"
+      - "${PORT_MAIL_UI:-61026}:8025"
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   health_data:
     driver: local
+  course_management:
+  course_databases:
+  course_backups:
+  course_journals:
+  course_encryption:
 
 networks:
   training:

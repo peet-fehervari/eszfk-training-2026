@@ -77,11 +77,7 @@ That single asymmetry is the whole architecture.
 
 ### 5. Prove it
 
-```bash
-./setup/verify.sh
-```
-
-Or by hand - on the code instance:
+On the code instance:
 
 ```objectscript
 zn "TRAINING"
@@ -98,7 +94,7 @@ zwrite ^MyProof
 **Expect a delay.** ECP does not push every write to the data server immediately;
 modified blocks sit in the client cache until they are flushed. Reading the data
 instance straight away can show nothing, which looks like a broken setup but is
-normal ECP behaviour. `verify.sh` polls for this reason.
+normal ECP behaviour. Wait a few seconds and read it again.
 
 ### 6. Optional - show that the code really did stay put
 
@@ -112,12 +108,4 @@ To do the exercise again from scratch:
 
 ```bash
 docker compose down -v && docker compose up -d
-```
-
-To skip ahead to the finished state, or to check your own work against it:
-
-```bash
-./setup/01-data-server.sh
-./setup/02-code-server.sh
-./setup/verify.sh
 ```

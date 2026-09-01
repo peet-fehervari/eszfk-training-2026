@@ -12,11 +12,19 @@
 # own Web Gateway.
 #
 # The stack comes up prepared but with no mirror configured: creating it is the
-# exercise. See EXERCISE.md, and setup/ for the scripted equivalent.
+# exercise. See EXERCISE.md.
 #
 # Start:  docker compose up -d
 # Portal: http://localhost:63773/csp/sys/UtilHome.csp   (member A, SuperUser / SYS)
 #         http://localhost:63774/csp/sys/UtilHome.csp   (member B)
+#
+# Both members also carry the course exercise directories (/Management, /databases,
+# /backups, /journals) as volumes, so this stack can be used for the course's mirroring
+# module - the participant works on both machines, with the same paths on each. Run
+# ../common/course/prepare-instance.sh against both containers once after a recreate.
+#
+# The course's mirroring module asks for an arbiter; there is an opt-in one here behind
+# the "arbiter" profile:  docker compose --profile arbiter up -d
 
 name: iris-training-mirror
 
@@ -29,17 +37,47 @@ services:
     entrypoint: ["/tini", "--", "/irisdev/common/start.sh"]
     environment:
       ISC_CPF_MERGE_FILE: /irisdev/cpf/member-a.cpf
+    # Published ports are .env overrides with the documented default, because Windows
+    # reserves blocks of high ports for its own NAT and a reserved one cannot be
+    # published at all - Compose then fails with "/forwards/expose returned unexpected
+    # status: 500". See 01-health-single/docker-compose.yml for the whole note.
     ports:
-      - "63972:1972"
+      - "${PORT_MIRROR_A_SUPERSERVER:-63972}:1972"
       # ISCAgent. Members reach each other's agent over the stack network, so
       # publishing is not required for the mirror to work; it is here so the agent
       # can be probed from the host while diagnosing.
-      - "63188:2188"
+      - "${PORT_MIRROR_A_AGENT:-63188}:2188"
+    # Pinned to two cores. IRIS checks the licence against the number of cores it can
+    # see, and on a host with more cores than the key allows it falls back to a minimal
+    # licence almost silently - which only surfaces much later as missing
+    # Interoperability or an HTTP 503. Pinning also stops five training instances from
+    # fighting over one laptop. Override with IRIS_CPUS in the stack's .env.
+    deploy:
+      resources:
+        limits:
+          cpus: '${IRIS_CPUS:-2.0}'
+        reservations:
+          cpus: '${IRIS_CPUS:-2.0}'
     volumes:
       - ../common:/irisdev/common:ro
       - ./cpf:/irisdev/cpf:ro
       - ${IRIS_KEY_DIR:-../keys}:/irisdev/keys:ro
-      - mirror_a_data:/usr/irissys/mgr
+      # The whole instance directory, not just mgr/ inside it. iris.cpf lives in
+      # /usr/irissys, so with only mgr/ in the volume the mirror configuration - and
+      # every namespace, database and mapping created during the exercise - is gone as
+      # soon as the container is recreated: a `docker compose down` and `up`, or any
+      # edit to this file. Measured on 2026.1. With /usr/irissys in the volume a
+      # recreate keeps it all and only `down -v` resets the stack. About 1.5 GB each.
+      - mirror_a_data:/usr/irissys
+      # The course exercise directories, at the paths the exercise text uses. They are
+      # outside /usr/irissys, so without these volumes a recreate would take the student
+      # files, the backups and the journals with it. Docker creates each mount point
+      # root-owned, so prepare-instance.sh chowns them to the IRIS user.
+      - a_management:/Management
+      - a_databases:/databases
+      - a_backups:/backups
+      - a_journals:/journals
+      - a_encryption:/InterSystems
     healthcheck:
       test: ["CMD", "/irisHealth.sh"]
       interval: 10s
@@ -68,13 +106,28 @@ services:
       mirror-a:
         condition: service_healthy
     ports:
-      - "63973:1972"
-      - "63189:2188"
+      - "${PORT_MIRROR_B_SUPERSERVER:-63973}:1972"
+      - "${PORT_MIRROR_B_AGENT:-63189}:2188"
+    # See member A above for why the cores are pinned.
+    deploy:
+      resources:
+        limits:
+          cpus: '${IRIS_CPUS:-2.0}'
+        reservations:
+          cpus: '${IRIS_CPUS:-2.0}'
     volumes:
       - ../common:/irisdev/common:ro
       - ./cpf:/irisdev/cpf:ro
       - ${IRIS_KEY_DIR:-../keys}:/irisdev/keys:ro
-      - mirror_b_data:/usr/irissys/mgr
+      # /usr/irissys, not /usr/irissys/mgr - see member A above.
+      - mirror_b_data:/usr/irissys
+      # Course exercise directories - see member A above. The mirroring module has the
+      # participant do the same steps on both members, so B gets the same paths.
+      - b_management:/Management
+      - b_databases:/databases
+      - b_backups:/backups
+      - b_journals:/journals
+      - b_encryption:/InterSystems
     healthcheck:
       test: ["CMD", "/irisHealth.sh"]
       interval: 10s
@@ -103,7 +156,7 @@ services:
       ISC_CSP_CONF_FILE: /webgateway-shared/CSP.conf
       ISC_CSP_INI_FILE: /webgateway-shared/CSP.ini
     ports:
-      - "63773:80"
+      - "${PORT_MIRROR_A_PORTAL:-63773}:80"
     volumes:
       - ../common/webgateway/CSP.conf:/webgateway-shared/CSP.conf:ro
       - ./webgateway/member-a-CSP.ini:/webgateway-shared/CSP.ini:ro
@@ -126,10 +179,70 @@ services:
       ISC_CSP_CONF_FILE: /webgateway-shared/CSP.conf
       ISC_CSP_INI_FILE: /webgateway-shared/CSP.ini
     ports:
-      - "63774:80"
+      - "${PORT_MIRROR_B_PORTAL:-63774}:80"
     volumes:
       - ../common/webgateway/CSP.conf:/webgateway-shared/CSP.conf:ro
       - ./webgateway/member-b-CSP.ini:/webgateway-shared/CSP.ini:ro
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # This stack has no arbiter by design: without one, takeover is a manual operator
+  # decision, which is the lesson. The course's mirroring module asks for "Use Arbiter:
+  # Yes", so one is available opt-in, and only for that:
+  #
+  #   docker compose --profile arbiter up -d
+  #
+  # An arbiter is an ISCAgent on a third machine and nothing else, so this is the same
+  # image started with --up false: iris-main starts the agent and leaves IRIS down. No
+  # licence key and no volumes; an arbiter stores nothing. In the Create Mirror form use
+  # address "arbiter" and port 2188 - the service name, not localhost.
+  arbiter:
+    image: ${IRIS_IMAGE:-containers.intersystems.com/intersystems/iris:2026.1}
+    container_name: course-arbiter
+    hostname: arbiter
+    profiles: ["arbiter"]
+    restart: unless-stopped
+    entrypoint: ["/tini", "--", "/iris-main", "--up", "false"]
+    ports:
+      - "${PORT_ARBITER_AGENT:-63190}:2188"
+    # Pinned like the members, for consistency. An arbiter runs an ISCAgent and nothing
+    # else, so it does not need this - but it does not need more than a core either.
+    deploy:
+      resources:
+        limits:
+          cpus: '${IRIS_CPUS:-2.0}'
+        reservations:
+          cpus: '${IRIS_CPUS:-2.0}'
+    networks:
+      - training
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Mail server for the course's notification exercises (^MONMGR, Task Manager,
+  # two-factor). In IRIS, use host "mail" and port 1025; the inbox is on the host at
+  # http://localhost:61026. Not started by default - Docker Hub is not always reachable,
+  # and a failed pull in the default service set would take IRIS down with it:
+  #
+  #   docker compose --profile mail up -d
+  #
+  # The container name and ports are the same in all three stacks, so only one stack can
+  # run the mail server at a time. That is enough: the course is done in one stack.
+  mail:
+    image: ${MAILHOG_IMAGE:-mailhog/mailhog:latest}
+    container_name: course-mail
+    profiles: ["mail"]
+    restart: unless-stopped
+    ports:
+      - "${PORT_MAIL_SMTP:-61025}:1025"
+      - "${PORT_MAIL_UI:-61026}:8025"
     networks:
       - training
     logging:
@@ -143,6 +256,16 @@ volumes:
     driver: local
   mirror_b_data:
     driver: local
+  a_management:
+  a_databases:
+  a_backups:
+  a_journals:
+  a_encryption:
+  b_management:
+  b_databases:
+  b_backups:
+  b_journals:
+  b_encryption:
 
 networks:
   training:

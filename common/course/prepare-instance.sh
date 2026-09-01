@@ -15,11 +15,12 @@
 # What it deliberately does NOT do: install the Phonebook application. That is the
 # "Applications" module - see install-phonebook.sh next to this script.
 #
-# Persistence. Paths that the stack does not declare as a volume live in the container's
-# writable layer: they survive `docker compose restart` and `stop`/`start`, and are lost
-# by `down` or any recreate. Re-run this script after one. To keep them across a recreate,
-# add the stack's `course-overlay.yml` (see README.md in this directory), which declares
-# them as named volumes; this script then only fixes their ownership.
+# Persistence. The course directories are named volumes in every stack's compose file, so
+# what is in them survives a recreate. Docker creates the mount point for a path that does
+# not exist in the image root-owned, though, so the volumes alone are not usable - fixing
+# their ownership is what this script is for. The OS accounts are different: they live in
+# the container's writable layer and any recreate loses them, so re-run this script after
+# one. It is idempotent and leaves a populated /Management alone.
 #
 # Usage:  ./prepare-instance.sh <container> [container ...]
 #         ./prepare-instance.sh training-ecp-code training-ecp-data
@@ -92,7 +93,7 @@ for container in "$@"; do
        [ -z "$(find "$MATERIAL_DIR" -mindepth 1 -not -name README.md -print -quit)" ]; then
         bad "no student files in $MATERIAL_DIR"
         note "They are licensed material and are handed out separately."
-        note "Placement instructions: PREREQUISITES.md next to this script."
+        note "Placement instructions: README.md next to this script."
     elif [ -n "$(docker exec "$container" bash -c \
             "find $MANAGEMENT_DIR -mindepth 1 -not -name README.md -print -quit 2>/dev/null")" ]; then
         ok "$MANAGEMENT_DIR already populated, left alone"
@@ -114,9 +115,12 @@ for container in "$@"; do
 done
 
 if [ "$fails" -eq 0 ]; then
-    echo "Prerequisites in place. Next:"
-    echo "  ./install-phonebook.sh <container>    # the \"Applications\" module, scripted"
-    echo "  ./verify.sh <container>               # checks the exercises can be carried out"
+    echo "Prerequisites in place. The exercises can be started."
+    echo "Re-run this script at any time to check or repair the same things."
+    echo
+    echo "Optional: ./install-phonebook.sh <container> installs the Phonebook application"
+    echo "instead of the participant. Skip it if the \"Configuration for the Application\""
+    echo "and \"Applications\" modules are to be done by hand."
 else
     echo "$fails step(s) failed." >&2
     exit 1

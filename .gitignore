@@ -7,7 +7,7 @@ keys/
 
 # The course student files are licensed InterSystems content, distributed to
 # participants separately. Nothing under here is committed - where they go is
-# documented in common/course/PREREQUISITES.md.
+# documented in common/course/README.md.
 common/course/material/
 
 # The course exercise text itself is licensed material too, and is distributed to

@@ -1,0 +1,26 @@
+# Line endings.
+#
+# Every .sh in this repository is executed inside a Linux container or by bash on the
+# host. A CRLF line ending breaks both: bash reports "\r: command not found", and a
+# script piped into `iris session` fails because the CR is read as part of the command.
+# The container entrypoint (common/start.sh) is the worst case - the container simply
+# will not start.
+#
+# On a Windows clone Git converts line endings on checkout unless it is told not to,
+# so the rule is set here rather than left to each machine's core.autocrlf.
+*.sh    text eol=lf
+*.cpf   text eol=lf
+*.conf  text eol=lf
+*.ini   text eol=lf
+
+# The PowerShell equivalents run on Windows and are fine with CRLF; PowerShell reads
+# LF as well, so this is a convenience, not a requirement.
+*.ps1   text eol=crlf
+
+# Everything else: normalise in the repository, check out with the platform's own
+# ending. Documentation and Compose files are read by tools that accept both.
+*       text=auto
+
+*.docx  binary
+*.gif   binary
+*.key   binary

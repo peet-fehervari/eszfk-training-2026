@@ -1,85 +1,175 @@
 # "Managing InterSystems Servers" course add-on
 
-Turns any already-running instance in this repository into the environment the course
-exercises expect. No stack of its own, no image build.
+Turns an already-running instance from any of the three stacks into the environment the
+course exercises expect: the directories, the OS accounts and the student files. No stack of
+its own, no image build, no configuration to edit - one script, and optionally a second one
+that installs the Phonebook application instead of the participant.
 
-## Getting started
+Where the exercise text says something that is different in a container - a path, a port,
+a command - it is listed module by module in [COURSE-NOTES.md](COURSE-NOTES.md).
 
-1. **Copy the student files into `material/`.** They are licensed material and are handed
-   out separately, so the directory is not in the repository — create it and copy the
-   *contents* of `StudentFilesforManagementDirectory` into it. The file list is in
-   [PREREQUISITES.md](PREREQUISITES.md).
+## 1. Put two files in place
 
-2. **Start a stack** (any of them; pick one and stay with it):
+Both are licensed material, so neither is in this repository.
 
-   ```bash
-   cd ../../01-health-single
-   docker compose -f docker-compose.yml -f course-overlay.yml up -d
-   ```
+| What | Where it goes |
+|---|---|
+| The IRIS licence key | `keys/2026/iris.key` at the top of this repository (`2026` = the licence year) |
+| The course student files | `common/course/material/` - the **contents** of `StudentFilesforManagementDirectory`, not the folder around them |
 
-   `course-overlay.yml` is optional. Without it everything works, but the course
-   directories are lost by a container recreate — see *Persistence* below.
+Create `material/` yourself; it is gitignored, so it does not exist in a fresh clone. The
+files, as the archive ships them:
 
-3. **Run these two scripts from this directory**, with the container name of the
-   instance you started:
+```
+common/course/material/
+├── ClassFilesExplained.txt
+├── MIS.Simulation.xml
+├── MailSlurperConfig.ps1
+├── PhonebookClasses.xml
+├── PhonebookInstaller.xml
+├── swcvt.xml
+├── zstart.xml
+├── DelegatedAuthentication/
+│   ├── README.txt
+│   ├── ZAuth.xml
+│   └── Zen.xml
+└── PhonebookFiles/
+    ├── Company.csp
+    └── cube_logo_blue.gif
+```
 
-   ```bash
-   cd ../common/course
-   ./prepare-instance.sh training-health      # directories, OS accounts, student files
-   ./install-phonebook.sh training-health     # the "Applications" module, scripted
-   ```
+`Thumbs.db` and any other Windows artefact can be skipped.
 
-4. **Check IRIS is working:**
+To keep either of them somewhere else: `COURSE_MATERIAL_DIR=/somewhere/else
+./prepare-instance.sh training-health` for the files, and for the key copy `.env.example`
+to `.env` **in the stack directory you start** and set `IRIS_KEY_DIR`. A `.env` in the
+repository root is not read - Compose only reads the one next to the compose file it runs.
 
-   ```bash
-   ./verify.sh training-health 61773
-   ```
+## 2. Install
 
-   Expect `No failures`. The one warning on a default start is the mail server, which is
-   optional. Add `--no-restart` to skip the part that stops and starts IRIS.
+```bash
+cd 01-health-single
+docker compose up -d
+docker compose ps                      # wait until both containers are healthy
 
-5. **Log in to the portal** at `http://localhost:61773/csp/sys/UtilHome.csp` as
-   `SuperUser` / `SYS`, and start the exercises. Read
-   [PREREQUISITES.md](PREREQUISITES.md) first: it lists every point where the container
-   differs from the printed notes (instance name, paths, how to restart the instance).
+cd ../common/course
+./prepare-instance.sh training-health
+```
 
-## Which container and which port
+On Windows, the same script in PowerShell: `.\prepare-instance.ps1 training-health`.
 
-| Stack | Container to pass to the scripts | Portal port |
+That is the whole installation. It creates, inside the container:
+
+- `/Management`, `/databases`, `/backups`, `/journals/jrn`, `/journals/altjrn` and
+  `/InterSystems/training/encryptionkey`, owned by the IRIS user, so every exercise that
+  types a path can type the one in the printed notes;
+- the eight OS accounts the authentication module logs in as - `sumi`, `chris`, `olaf`,
+  `anita`, `bo`, `vic`, `robin`, `fred` (password = username, except `bo`, whose password
+  is `bobo`);
+- a copy of the student files in `/Management`.
+
+It prints `OK` or `FAILED` for each of those and ends with `Prerequisites in place. The
+exercises can be started.` **Re-run it whenever you want to check or repair the same
+things**: it is idempotent, it reports the current state, and it leaves a populated
+`/Management` alone. There is no separate check script to remember.
+
+Every path is a variable with the course's own default (`COURSE_DIRS`, `MANAGEMENT_DIR`,
+`DB_DIR`, `BACKUP_DIR`, `COURSE_MATERIAL_DIR`, `COURSE_OS_USERS`), so the material can live
+outside the repository and the directories can be moved without editing a script. Nothing
+has to be set for the default course layout.
+
+## 3. Optional - skip ahead past the application setup
+
+```bash
+./install-phonebook.sh training-health          # .\install-phonebook.ps1 on Windows
+```
+
+**This script does exercise work**, and it is the only one that does. It runs the course's
+own `%Installer`, which creates the databases, the `PHONEBOOK` namespace, the global
+mappings and the `/csp/phonebook` and `/csp/company` applications - exactly what the
+"Configuration for the Application" and "Applications" modules have the participant create
+by hand. It then imports `MIS.Simulation`, the helper class the backup and monitoring
+exercises call.
+
+So there is one choice to make:
+
+| | Run it | Do not run it |
+|---|---|---|
+| The exercises start at | the **Applications** module | the **Configuration for the Application** module |
+| The Phonebook application is | already installed | built by the participant, as the course intends |
+
+Everything from Journaling onwards operates on the Phonebook databases, so a participant
+who does not get through those two modules cannot do the rest either. That is what this
+script is for - as a shortcut for a demo instance, or as a rescue for somebody who got
+stuck. It is not idempotent: if the databases already exist the installer stops with
+`ERROR #20: the file already exists`, and the way back is `docker compose down -v`.
+
+## 4. Start the exercises
+
+Portal at `http://localhost:61773/csp/sys/UtilHome.csp`, `SuperUser` / `SYS`.
+
+The Installation module cannot be done in a container - IRIS is already installed - so read
+it and skip it. Then read [COURSE-NOTES.md](COURSE-NOTES.md): two rules there ("open a
+Terminal session" and "restart your instance") cover most of the differences on their own,
+and the rest is listed module by module.
+
+One thing worth checking first, because an unlicensed instance starts almost silently and
+only fails much later:
+
+```bash
+docker compose logs health | grep -i "LMF Info"      # expect: Licensed for N cores
+```
+
+## Which container, which port
+
+| Stack | Container for the scripts | Portal |
 |---|---|---|
 | `01-health-single` | `training-health` | 61773 |
 | `02-code-data-ecp` | `training-ecp-code` | 62773 |
 | `03-mirror-failover` | `training-mirror-a` | 63773 |
 
-Stacks 2 and 3 have a second instance (`training-ecp-data`, `training-mirror-b`) that the
-ECP and mirroring modules can use as the partner machine. `prepare-instance.sh` takes
-several container names at once.
+Pick one stack and stay with it. Stacks 2 and 3 have a second instance
+(`training-ecp-data`, `training-mirror-b`) that the ECP and mirroring modules use as the
+partner machine; `prepare-instance.sh` takes several containers at once:
 
-## Persistence
+```bash
+./prepare-instance.sh training-mirror-a training-mirror-b
+```
 
-`prepare-instance.sh` creates the course directories and the OS accounts *inside a running
-container*. That survives `docker compose restart` and `stop`/`start`, and is lost by
-`down` or any recreate — the container's writable layer goes with it.
+## Two things to know about restarting
 
-- Adding the stack's `course-overlay.yml` makes the course directories named volumes, so
-  their contents survive everything but `down -v`. The OS accounts still do not.
-- **After any recreate, re-run `prepare-instance.sh`.** It is idempotent and leaves
-  `/Management` alone once populated.
-- Note that the *instance configuration* (`iris.cpf`: databases, namespaces, mappings) is
-  not in a volume either, so a recreate resets it while the database files remain. To redo
-  the Applications module cleanly, start from `docker compose down -v`.
+- **`iris stop`/`iris start` is free.** Every exercise that restarts the instance works,
+  and the container stays up while IRIS is down.
+- **A container recreate loses the OS accounts.** They live in the container's writable
+  layer, not in a volume, so after any `docker compose down`/`up` re-run
+  `prepare-instance.sh` - it is idempotent, and it leaves `/Management` alone once
+  populated. Everything else survives: the instance configuration and all the course
+  directories are volumes.
 
-## The three scripts
+Full reset, discarding everything including the work done in the exercises:
 
-| Script | What it does |
-|---|---|
-| `prepare-instance.sh <container>...` | Creates `/Management`, `/databases`, `/backups`, `/journals/{jrn,altjrn}` and `/InterSystems/training/encryptionkey` owned by uid 51773; creates the eight OS accounts the authentication module logs in as; copies the student files into `/Management` |
-| `install-phonebook.sh <container>` | Imports `PhonebookInstaller.xml` and runs `RunInstall`, then imports `MIS.Simulation` — the "Applications" module without doing it by hand |
-| `verify.sh [--no-restart] <container> [portal port]` | Checks licence, directories, the Phonebook application, `MIS.Simulation`, the web applications, OS accounts, ISCAgent, and the stop/start plus emergency-access-mode round trip |
+```bash
+docker compose down -v && docker compose up -d
+../common/course/prepare-instance.sh training-health
+../common/course/install-phonebook.sh training-health    # only if it was used before
+```
 
-Every path is a variable with the course's own default (`COURSE_DIRS`, `MANAGEMENT_DIR`,
-`DB_DIR`, `BACKUP_DIR`, `COURSE_MATERIAL_DIR`, `COURSE_OS_USERS`), so the material can
-live outside the repository and the directories can be moved without editing a script.
+Use `-v`. A `down` without it keeps the volumes but the Phonebook installer will not
+create a database over a leftover `IRIS.DAT`.
+
+## Optional: the mail server
+
+Four exercises send mail (`^MONMGR`, Task Manager, two-factor authentication). MailHog
+does the job MailSlurper does on a Windows desktop and is in every stack's compose file
+behind a profile, because it is the one image not from `containers.intersystems.com` and a
+failed pull must not take IRIS with it:
+
+```bash
+docker compose --profile mail up -d
+```
+
+In IRIS use SMTP host `mail`, port `1025`; the inbox is at `http://localhost:61026`. Do
+not run `MailSlurperConfig.ps1` - MailHog needs no configuration.
 
 ## No CPF change is needed
 
