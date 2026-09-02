@@ -23,7 +23,7 @@ Management Portal: <http://localhost:61773/csp/sys/UtilHome.csp> - `SuperUser` /
 ObjectScript shell / SQL shell:
 
 ```bash
-docker exec -it training-health iris session IRIS
+docker exec -it training-health iris session IRIS -U %SYS
 docker exec -it training-health iris sql IRIS
 ```
 

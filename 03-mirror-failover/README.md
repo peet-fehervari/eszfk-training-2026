@@ -65,50 +65,80 @@ the compose file.
 
 ## Adding the database on the backup
 
-Status: **not solved in this repository.** Steps 1-4 of the exercise were run and
-verified on the live pair; this step was not. It is the one thing left to work out.
+Status: **done and verified end to end on a live pair.** Every step of
+[EXERCISE.md](EXERCISE.md) has been run, including replication of real data and the takeover: a
+global written in `MIRRORNS` on member A was read back on member B, and after
+`docker stop training-mirror-a` plus `SYS.Mirror.BecomePrimary()` member B reported
+`MEMBERB Primary Active` / `MEMBERA Backup Down` with that global still there.
 
-What was established:
+The route is step 5 of [EXERCISE.md](EXERCISE.md): delete B's own copy, clear the leftovers,
+recreate the database at the catalogue's path with *Mirrored database? Yes*, recreate the
+namespace. It needs no `AddDatabaseNonPrimary` and no journal point. What the live pair
+established along the way - the traps are all in the details, which is why step 5 is long:
 
-- After the join, member A reports `MEMBERA Primary Active` / `MEMBERB Backup Active`
-  and member B reports the mirror image of that, so the mirror itself is healthy.
-- `SYS.Mirror.AddDatabase("/usr/irissys/mgr/mirrordata/","MIRRORDATA",1)` on member A
-  succeeds, and `Config.Databases:MirrorDatabaseList` on member A then lists
-  `MIRRORDATA|TRAINMIRROR|/usr/irissys/mgr/mirrordata/`.
-- The same query on member B returns **nothing**: its copy is an ordinary local
-  database, so a global written in `MIRRORNS` on the primary never appears there.
-  Journal transfer itself does work - member B's journal directory contains
-  `MIRROR-TRAINMIRROR-*` files.
-- The backup-side call is
-  `SYS.Mirror.AddDatabaseNonPrimary(Directory, MirrorSetName, MirrorDBName,
-  JrnPointMirfcnt, JrnPointOffset, DBInfo, RunCatchupDB, enableJournalOK)`.
-  Called with journal point `0,0` it fails with *"Journal file #0 not found in mirror
-  journal log"*, and with `1,0` with the same message for #1 - so the journal point
-  has to be a real mirror journal file counter, not a placeholder.
+- **Adding the database on A propagates a catalogue entry to B.** After step 3, A's
+  `SYS.Mirror:MirroredDatabaseList` holds
+  `MIRRORDATA | /usr/irissys/mgr/mirrordata/ | TRAINMIRROR`, and B's
+  `SYS.Mirror:MissingMirroredDatabases` returns `:mirror:TRAINMIRROR:MIRRORDATA`. B knows the
+  name, the mirror set **and the directory**.
+- **The directory decides everything on B.** Creating the database there at the catalogue's
+  path is what makes IRIS treat it as the mirror's database. The *Create New Database* wizard
+  defaults *Directory* to the database name in **upper case**, and accepting that gave
+  `/usr/irissys/mgr/MIRRORDATA/`: an ordinary writable local database, `MirrorSetName=""`,
+  looking entirely normal in the database list, with `MissingMirroredDatabases` still
+  reporting the database as absent. That is the trap.
+- **Deleting the database in the portal does not dismount the one at the catalogue's path.**
+  Measured on B: after the delete and an `rm -rf` of the directory,
+  `SYS.Database.%OpenId("/usr/irissys/mgr/mirrordata/")` still reported `Mounted=1`,
+  `ReadOnlyMounted=1` (the mirror mounts the backup's copy read-only) and
+  `CanDatabaseBeMirrored()` returned `0`, while `messages.log` showed a dismount only for the
+  *other*, hand-made `/usr/irissys/mgr/MIRRORDATA/`. The wizard then fails with
+  `ERROR #70: *** Error while formatting volume because ERROR #60: the database must be dismounted
+  to do this ERROR #73: No such directory` - three statuses of which only `#60` names the cause,
+  and `#73` points at the mounted database's missing files rather than at the directory just
+  created. An `iris stop` / `iris start` on the member clears it;
+  `SYS.Database.DismountDatabase()` does not - it fails with
+  `<PROTECT>Dismount+6^SYS.Database.1`, since the mirror holds the backup's copy read-only.
+- **The wizard's second page is where the mirror is actually declared.** *Mirrored database?*
+  must be `Yes` and *Mirror DB Name* must be the mirror's name for the database (`MIRRORDATA`,
+  a field of its own, not derived from *Name*). *Journal globals?* is forced to `Yes` and greyed
+  out once mirroring is on. With the right directory and *Mirrored database?* left at `No` the
+  result is the same ordinary local database as above.
+- **`SYS.Mirror.DownloadMirrorDatabase(MirrorSetName, MirrorDBName, RunBackground)` does not
+  create anything.** It performs the download for a database that is already in *download
+  mode*, which is the state the portal puts it in when created at the catalogue's path. Called
+  with nothing there it fails with
+  `ERROR #5001: Existing mirror DB '/usr/irissys/mgr/mirrordata/' is not in Download mode`.
+- **`SYS.Database` reports the mount table, not the disk.** `%OpenId("/usr/irissys/mgr/mirrordata/")`
+  on B returned an object with `Mounted=1`, `ReadOnlyMounted=1`, `MirrorSetName=TRAINMIRROR` and
+  `MirrorDBName=MIRRORDATA` while the directory was deleted from disk and the database gone from
+  the CPF - it was reporting the mount left over from instance start, which reads as "present and
+  mirrored" when neither is true. After an `iris stop` / `iris start` the same call raises
+  `<INVALID OREF>`. A bogus directory returns nothing either way, so it looks like a real check on
+  the database. It is not.
+- `Config.Databases:MirrorDatabaseList`, which this README used to recommend, returns nothing
+  on the backup even when the mirror is healthy. `SYS.Mirror:MirroredDatabaseList` and
+  `SYS.Mirror:MissingMirroredDatabases` are the queries to use.
 
-Where to look next:
+- **The success state on B**, once step 5 is done: `SYS.Mirror:MirroredDatabaseList` returns the
+  same single row as on A, `SYS.Mirror:MissingMirroredDatabases` returns nothing, and
+  `SYS.Database.%OpenId("/usr/irissys/mgr/mirrordata/")` reports `Mounted=1`,
+  `ReadOnlyMounted=1`, `MirrorDBDownload=0`, `MirrorActivationRequired=0`, `MirrorDBCatchup=0`.
+  Read-only is correct there - it is the backup's copy.
 
-- **The most promising route avoids the API entirely.** From 2025.1 IRIS can download a
-  mirrored database to a non-primary member by itself: on the backup, create the database
-  through the portal with *Mirrored Database: Yes*, and its data is fetched from the primary
-  on save. No journal point, no `AddDatabaseNonPrimary`. This is the route the course's own
-  mirroring module takes, and it is now written out as step 5 of [EXERCISE.md](EXERCISE.md).
-  It has not been run on this pair yet, but it needs nothing that is missing here.
-- **What probably blocks it:** `cpf/member-b.cpf` already creates `MIRRORDATA` on member B, in
-  the same directory, so there is a local database and an `IRIS.DAT` in the way - and IRIS
-  refuses to create a database over a leftover file (`ERROR #20: the file already exists`).
-  Step 5 therefore deletes B's copy first. Dropping the `CreateDatabase` line from
-  `member-b.cpf` would remove the obstacle instead, at the cost of the two members no longer
-  starting out symmetrical.
-- `SYS.Mirror:JournalList(MirrorName)` and `SYS.Mirror:MissingMirroredDatabases(MirrorSetName)`
-  are queries on a live instance; the second is what the portal's backup-side page
-  lists, and it should give the values the call wants.
+Two APIs that look like the answer and are not needed:
+
+- `SYS.Mirror.AddDatabaseNonPrimary(Directory, MirrorSetName, MirrorDBName, JrnPointMirfcnt,
+  JrnPointOffset, DBInfo, RunCatchupDB, enableJournalOK)` is the older backup-side call. It wants
+  a real mirror journal file counter: `0,0` fails with *"Journal file #0 not found in mirror
+  journal log"* and `1,0` the same for #1. The portal route in step 5 needs none of this.
 - `SYS.Mirror.ActivateMirroredDatabase(Directory)` and
-  `SYS.Mirror.CatchupDB(DBList, JournalLocation, &DBErrList)` are the follow-up
-  operations if the database is added but stays inactive or behind.
-- The portal route (Mirror Monitor on member B) fills these in from the mirror's own
-  state, so doing it once in the UI and reading back the resulting configuration is
-  probably faster than deriving the arguments.
+  `SYS.Mirror.CatchupDB(DBList, JournalLocation, &DBErrList)` - or the Mirror Monitor's
+  *Activate* and *Catchup* - are only for a database that is added but stays inactive or behind.
+  On this pair the download left nothing to do.
 
-Until this is done, the exercise stops being verifiable at step 5: the roles and the
-takeover are demonstrable, replication of actual data is not.
+One design choice worth knowing: `cpf/member-b.cpf` creates `MIRRORDATA` on member B at the same
+directory as on A, so step 5 has to delete it before it can be recreated as the mirror's copy.
+Dropping that `CreateDatabase` line would let step 5 start straight at the create, at the cost of
+the two members no longer coming up symmetrical - and the delete is itself instructive, since it
+is where the mount and directory leftovers above show up. It stays.

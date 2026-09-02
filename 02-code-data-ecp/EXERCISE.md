@@ -170,7 +170,7 @@ That single asymmetry is the whole architecture.
 Open a session on the code instance - this is what "open a Terminal session" means here:
 
 ```bash
-docker exec -it training-ecp-code iris session IRIS
+docker exec -it training-ecp-code iris session IRIS -U %SYS
 ```
 
 and write a global:
@@ -184,7 +184,7 @@ halt
 Then read it on the data instance:
 
 ```bash
-docker exec -it training-ecp-data iris session IRIS
+docker exec -it training-ecp-data iris session IRIS -U %SYS
 ```
 
 ```objectscript
