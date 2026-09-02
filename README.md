@@ -73,10 +73,15 @@ script does are in [common/course/README.md](common/course/README.md):
 | Stack | Instance | Superserver | Portal | ISCAgent |
 |---|---|---|---|---|
 | 1 | health | 61972 | 61773 | |
-| 2 | code | 62972 | 62773 | |
-| 2 | data | 62973 | 62774 | |
+| 2 | code | 62872 | 62773 | |
+| 2 | data | 62873 | 62774 | |
 | 3 | member A | 63972 | 63773 | 63188 |
 | 3 | member B | 63973 | 63774 | 63189 |
+
+The pattern is `6<stack>972` for the superserver and `6<stack>773` for the portal. Stack 2's
+two superserver ports are the exception - 628xx instead of 629xx - because WinNAT on the
+training host had reserved the block 62943-63042, and a reserved port cannot be published at
+all. The portals are unaffected.
 
 Two optional containers, started only with their profile, add the mail server on 61025
 (SMTP) and 61026 (inbox) and stack 3's arbiter on 63190:

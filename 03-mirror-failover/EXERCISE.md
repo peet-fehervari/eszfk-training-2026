@@ -22,18 +22,18 @@ see the header of `docker-compose.yml`.
 
 ## 1. Enable the mirror service on both members
 
-System Administration > Security > Services > `%Service_Mirror` > tick *Enabled*.
-(Page class `%CSP.UI.Portal.Services`.)
+**System Administration** → **Security** → **Services** → `%Service_Mirror` → tick
+*Service Enabled*.
 
 It is off in a fresh instance. Do it on **both** members - the mirror pages stay
 mostly empty until it is on.
 
-**Observable result:** System Administration > Configuration > Mirror Settings now
-offers *Create a Mirror* and *Join as Failover*.
+**Observable result:** **System Administration** → **Configuration** → **Mirror Settings**
+now offers *Create Mirror* and *Join Mirror as Failover*.
 
 ## 2. Create the mirror set on member A
 
-Mirror Settings > *Create a Mirror*. (Page class `%CSP.UI.Portal.Mirror.Create`.)
+**System Administration** → **Configuration** → **Mirror Settings** → *Create Mirror*.
 
 - Mirror name: `TRAINMIRROR`
 - Member name: `MEMBERA`
@@ -44,20 +44,21 @@ Mirror Settings > *Create a Mirror*. (Page class `%CSP.UI.Portal.Mirror.Create`.
   name**, not `localhost` - member B resolves this name on the stack network, and
   `localhost` there would mean member B itself.
 
-**Observable result:** Mirror Monitor (`%CSP.UI.Portal.Mirror.Monitor`) shows
-`MEMBERA` as `Primary`, status `Active`.
+**Observable result:** the *Mirror Monitor* shows `MEMBERA` as `Primary`, status `Active`.
+The monitor sits one level below the portal home page, not under *Configuration*; once a
+mirror exists the home page links to it directly.
 
 ## 3. Add the database to the mirror on member A
 
-Mirror Monitor > *Add databases to mirror*, and pick `MIRRORDATA`.
+In the *Mirror Monitor*, *Add databases to mirror*, and pick `MIRRORDATA`.
 
 **Observable result:** `MIRRORDATA` is listed as a mirrored database of
 `TRAINMIRROR`, and its journalling stays on.
 
 ## 4. Join member B as the second failover member
 
-On member B's portal: Mirror Settings > *Join as Failover*. (Page class
-`%CSP.UI.Portal.Mirror.JoinFailover`.)
+On member B's portal: **System Administration** → **Configuration** → **Mirror Settings** →
+*Join Mirror as Failover*.
 
 - Mirror name: `TRAINMIRROR`
 - Agent address of the primary: `mirror-a`, port `2188`
@@ -123,7 +124,7 @@ backup**. This is the point of the exercise: with only two members and no arbite
 member B cannot tell "A is dead" from "the network to A is broken", and promoting
 itself on a guess would risk two primaries writing divergent data.
 
-Promote it deliberately - Mirror Monitor > *Become primary*, or from a session on
+Promote it deliberately - in the *Mirror Monitor*, *Become primary*, or from a session on
 member B:
 
 ```

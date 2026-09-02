@@ -86,6 +86,13 @@ What was established:
 
 Where to look next:
 
+- **The most promising route avoids the API entirely.** From 2025.1 IRIS can download a
+  mirrored database to a non-primary member by itself: on the backup, create the database
+  through the portal with *Mirrored Database: Yes*, and its data is fetched from the primary
+  on save. No journal point, no `AddDatabaseNonPrimary`. This is the route the course's own
+  mirroring module takes, and it is written up step by step in
+  [../common/course/COURSE-NOTES.md](../common/course/COURSE-NOTES.md) under *Mirroring*. It
+  has not been run on this pair yet, but it needs nothing that is missing here.
 - `SYS.Mirror:JournalList(MirrorName)` and `SYS.Mirror:MissingMirroredDatabases(MirrorSetName)`
   are queries on a live instance; the second is what the portal's backup-side page
   lists, and it should give the values the call wants.

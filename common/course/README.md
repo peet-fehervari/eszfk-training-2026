@@ -122,19 +122,30 @@ docker compose logs health | grep -i "LMF Info"      # expect: Licensed for N co
 
 ## Which container, which port
 
-| Stack | Container for the scripts | Portal |
-|---|---|---|
-| `01-health-single` | `training-health` | 61773 |
-| `02-code-data-ecp` | `training-ecp-code` | 62773 |
-| `03-mirror-failover` | `training-mirror-a` | 63773 |
+| Stack | Container for the scripts | Second instance | Portal |
+|---|---|---|---|
+| `01-health-single` | `training-health` | - | 61773 |
+| `02-code-data-ecp` | `training-ecp-code` | `training-ecp-data` | 62773 (code), 62774 (data) |
+| `03-mirror-failover` | `training-mirror-a` | `training-mirror-b` | 63773 (A), 63774 (B) |
 
-Pick one stack and stay with it. Stacks 2 and 3 have a second instance
-(`training-ecp-data`, `training-mirror-b`) that the ECP and mirroring modules use as the
-partner machine; `prepare-instance.sh` takes several containers at once:
+Always type the full portal path, `http://localhost:<port>/csp/sys/UtilHome.csp`. The bare
+host and port returns HTTP 404: the image has no web server of its own, and the Web Gateway
+container in front of it only maps `/csp/...`.
+
+Pick one stack and stay with it. The second instance in stacks 2 and 3 is the partner machine
+that the ECP and mirroring modules need, and **both instances have to be prepared** -
+`prepare-instance.sh` takes any number of containers at once, `install-phonebook.sh` one at a
+time:
 
 ```bash
 ./prepare-instance.sh training-mirror-a training-mirror-b
+./install-phonebook.sh training-mirror-a
+./install-phonebook.sh training-mirror-b
 ```
+
+Both modules work on the Phonebook databases on *both* machines, so if you are doing the
+Configuration and Applications modules by hand instead, do them on both.
+[COURSE-NOTES.md](COURSE-NOTES.md) lists the exact settings for each of the two modules.
 
 ## Two things to know about restarting
 

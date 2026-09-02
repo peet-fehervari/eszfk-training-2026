@@ -34,7 +34,10 @@ services:
     # published at all - Compose then fails with "/forwards/expose returned unexpected
     # status: 500". See 01-health-single/docker-compose.yml for the whole note.
     ports:
-      - "${PORT_DATA_SUPERSERVER:-62973}:1972"
+      # 62873, not the 62973 the numbering scheme would give: WinNAT on the training host
+      # had reserved 62943-63042, which covers both of this stack's 629xx superserver
+      # ports. Same reason for the code instance below.
+      - "${PORT_DATA_SUPERSERVER:-62873}:1972"
     # Pinned to two cores. IRIS checks the licence against the number of cores it can
     # see, and on a host with more cores than the key allows it falls back to a minimal
     # licence almost silently - which only surfaces much later as missing
@@ -95,7 +98,7 @@ services:
       data:
         condition: service_healthy
     ports:
-      - "${PORT_CODE_SUPERSERVER:-62972}:1972"
+      - "${PORT_CODE_SUPERSERVER:-62872}:1972"
     # See the data service above for why the cores are pinned.
     deploy:
       resources:
