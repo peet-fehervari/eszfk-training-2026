@@ -48,9 +48,40 @@ Both log in as `SuperUser` / `SYS`.
 Databases and namespaces are created declaratively by the CPF merge files in
 [cpf/](cpf/), applied on every container start and idempotent.
 
-There are no scripts here. Everything the stack prepares is done by the compose file
-and the CPF merges; the ECP wiring is done by hand in the portal, following
+There are no scripts in this directory. Everything the stack prepares is done by the compose
+file and the CPF merges; the ECP wiring is done by hand in the portal, following
 [EXERCISE.md](EXERCISE.md). To start over, `docker compose down -v` and up again.
+
+## For the "Managing InterSystems Servers" course
+
+This is the stack for the course's **Enterprise Cache Protocol** module, which is written for
+two machines - here they are the two instances above. Start the stack as above, then prepare
+**both** instances:
+
+```bash
+cd ../common/course
+./prepare-instance.sh training-ecp-code training-ecp-data
+./install-phonebook.sh training-ecp-data
+./install-phonebook.sh training-ecp-code
+```
+
+On Windows, in PowerShell:
+
+```powershell
+cd ..\common\course
+.\prepare-instance.ps1 training-ecp-code training-ecp-data
+.\install-phonebook.ps1 training-ecp-data
+.\install-phonebook.ps1 training-ecp-code
+```
+
+`prepare-instance` creates the exercise directories' ownership and the OS accounts, and has to
+be re-run after a container recreate; it is idempotent and reports `OK`/`FAILED` per
+prerequisite, so it doubles as the check. The Phonebook is needed on both sides because the
+module's remote database points at `/databases/company/` on the data server while the Company
+page is opened on the application server. The module's step-by-step deviations are in
+[common/course/COURSE-NOTES.md](../common/course/COURSE-NOTES.md) under *Enterprise Cache
+Protocol*; the installation itself is in
+[common/course/README.md](../common/course/README.md).
 
 ## Notes
 

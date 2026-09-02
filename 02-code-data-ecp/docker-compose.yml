@@ -85,7 +85,7 @@ services:
 
   # ---------------------------------------------------------- application server
   code:
-    image: containers.intersystems.com/intersystems/iris:2026.1
+    image: containers.intersystems.com/intersystems/irishealth:2026.1
     container_name: training-ecp-code
     restart: unless-stopped
     entrypoint: ["/tini", "--", "/irisdev/common/start.sh"]

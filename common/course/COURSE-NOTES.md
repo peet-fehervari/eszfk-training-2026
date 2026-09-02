@@ -290,7 +290,7 @@ running an ISCAgent.
 | Machine A's IP address | the service name `mirror-a` |
 | Machine B's IP address | the service name `mirror-b` |
 | Machine A's instance name | **`IRIS`**, not `TRAINING` |
-| the arbiter address | `arbiter`, only if you started the arbiter profile |
+| the arbiter address | not used - there is no arbiter here and none is needed |
 
 **Prepare both members first**, from `common/course/`:
 
@@ -326,7 +326,7 @@ those databases from earlier exercises".
   | Field | Value |
   |---|---|
   | Require SSL/TLS | **No** - the exercise is about mirroring, not certificates |
-  | Use Arbiter | **No** by default; `arbiter` / 2188 if you started the profile |
+  | Use Arbiter | **No**, fields empty - a two-member mirror needs none and every step here works without one |
   | Use Virtual IP | **No** - see below |
   | SuperServer Address | `mirror-a` |
   | Mirror Agent Port | 2188 |
@@ -353,14 +353,16 @@ those databases from earlier exercises".
 - **16-17**: the pages on member B are
   `http://localhost:63774/csp/company/Company.csp` and
   `http://localhost:63774/csp/phonebook/Phonebook.AllStart.cls`.
-- **19-20** (stop IRIS on A, watch B take over) is where this stack deliberately differs.
-  Stopping IRIS is rule 2, `docker exec training-mirror-a iris stop IRIS quietly`, and the
-  container stays up. **Without an arbiter, member B will not promote itself** - it cannot
-  tell a stopped partner from a broken network, so takeover is an operator decision: force it
-  from the Mirror Monitor on B, from `^MIRROR`, or with
-  `do ##class(SYS.Mirror).BecomePrimary()`. To see the automatic behaviour the notes describe,
-  start the arbiter first (`docker compose --profile arbiter up -d`) and give its address in
-  step 4. `iris start IRIS quietly` on A brings it back as the backup.
+- **19-20** (stop IRIS on A, watch B take over) is where this stack deliberately differs, and
+  it is the one place **not** to use rule 2. Stop the whole container instead:
+  `docker stop training-mirror-a`. The container also runs A's ISCAgent, and taking the agent
+  down with it is what leaves member B unable to find out what happened to its partner:
+  **member B stays the backup**, because it cannot tell a stopped partner from a broken
+  network. Takeover is then an operator decision - force it from the Mirror Monitor on B, from
+  `^MIRROR`, or with `do ##class(SYS.Mirror).BecomePrimary()`. `docker start
+  training-mirror-a` brings A back as the backup.
+  `iris stop IRIS quietly` leaves the agent up and answering, so IRIS can decide by itself
+  there; use it for the module's other restarts, not for this step.
 - **22** (remove the mirror configuration) works as printed, with rule 2 for each restart. If
   you only want a clean slate, `docker compose down -v` and `up -d` is faster and also
   discards the Phonebook, so re-run the two scripts above afterwards.

@@ -1,9 +1,58 @@
 # Exercise - split the code from the data over ECP
 
+Everything needed to follow this document is in it - the commands to start the stack, the
+commands to open a session, and the portal steps. Nothing else has to be read first.
+
+## Before you start
+
+The stack creates everything this exercise needs, so there is no preparation script to run
+for it. From the `02-code-data-ecp` directory:
+
+```bash
+docker compose up -d
+docker compose ps                        # wait until all four containers are healthy
+docker compose logs code | grep -i "LMF Info"    # expect: Licensed for N cores
+```
+
+On Windows, in PowerShell:
+
+```powershell
+docker compose up -d
+docker compose ps
+docker compose logs code | Select-String "LMF Info"
+```
+
+**Only if you are doing the course's *Enterprise Cache Protocol* module here** rather than
+this exercise on its own: that module works on the Phonebook databases, which this stack does
+not ship, so prepare both instances first. From the same directory:
+
+```bash
+cd ../common/course
+./prepare-instance.sh training-ecp-code training-ecp-data
+./install-phonebook.sh training-ecp-data
+./install-phonebook.sh training-ecp-code
+cd ../../02-code-data-ecp
+```
+
+On Windows, in PowerShell:
+
+```powershell
+cd ..\common\course
+.\prepare-instance.ps1 training-ecp-code training-ecp-data
+.\install-phonebook.ps1 training-ecp-data
+.\install-phonebook.ps1 training-ecp-code
+cd ..\..\02-code-data-ecp
+```
+
+`prepare-instance` creates the course directories and the OS accounts; it is idempotent and
+prints `OK` / `FAILED` per prerequisite, so it is also the check, and it has to be re-run
+after a container recreate. The module's own step-by-step deviations are in
+[../common/course/COURSE-NOTES.md](../common/course/COURSE-NOTES.md) under *Enterprise Cache
+Protocol*; the steps below are the same wiring with this stack's own names.
+
 ## Starting state
 
-`docker compose up -d` gives you two licensed instances. Everything is in place
-except the connection between them.
+Everything is in place except the connection between the two instances.
 
 The two portals, `SuperUser` / `SYS` - the full path is required, the bare host and
 port returns HTTP 404:
@@ -118,18 +167,30 @@ That single asymmetry is the whole architecture.
 
 ### 6. Prove it
 
-On the code instance:
+Open a session on the code instance - this is what "open a Terminal session" means here:
+
+```bash
+docker exec -it training-ecp-code iris session IRIS
+```
+
+and write a global:
 
 ```objectscript
 zn "TRAINING"
 set ^MyProof("hello")="from the code instance"
+halt
 ```
 
-then on the data instance:
+Then read it on the data instance:
+
+```bash
+docker exec -it training-ecp-data iris session IRIS
+```
 
 ```objectscript
 zn "DATA"
 zwrite ^MyProof
+halt
 ```
 
 **Expect a delay.** ECP does not push every write to the data server immediately;
@@ -150,3 +211,13 @@ To do the exercise again from scratch:
 ```bash
 docker compose down -v && docker compose up -d
 ```
+
+On Windows, in PowerShell - two lines, because Windows PowerShell has no `&&`:
+
+```powershell
+docker compose down -v
+docker compose up -d
+```
+
+If you ran the two course scripts above, run them again afterwards: `down -v` discards the
+Phonebook with everything else.
