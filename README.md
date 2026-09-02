@@ -59,12 +59,19 @@ script does are in [common/course/README.md](common/course/README.md):
    ./prepare-instance.sh training-health      # directories, OS accounts, student files
    ```
 
-   Re-run it at any time to check or repair the same things; it is idempotent, so there is
-   no separate check script. `./install-phonebook.sh training-health` is optional and is the
-   one script that does exercise work - it installs the Phonebook application instead of the
-   participant, letting the exercises start at the "Applications" module.
+   On Windows, in PowerShell:
 
-   On Windows the same scripts are there as `.ps1`, taking the same arguments.
+   ```powershell
+   cd ..\common\course
+   .\prepare-instance.ps1 training-health
+   ```
+
+   Re-run it at any time to check or repair the same things; it is idempotent, so there is
+   no separate check script. `./install-phonebook.sh training-health` - in PowerShell
+   `.\install-phonebook.ps1 training-health` - is optional and is the one script that does
+   exercise work: it installs the Phonebook application instead of the participant, letting
+   the exercises start at the "Applications" module.
+
    [common/course/COURSE-NOTES.md](common/course/COURSE-NOTES.md) then lists, module by
    module, every place where this environment differs from the printed exercise notes.
 

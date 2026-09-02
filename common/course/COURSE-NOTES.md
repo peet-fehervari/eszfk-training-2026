@@ -209,10 +209,18 @@ use **stack 2** (`02-code-data-ecp`), which exists for this exercise.
 
 **Prepare both instances first**, from `common/course/`:
 
-```
+```bash
 ./prepare-instance.sh training-ecp-code training-ecp-data
 ./install-phonebook.sh training-ecp-data
 ./install-phonebook.sh training-ecp-code
+```
+
+On Windows, in PowerShell:
+
+```powershell
+.\prepare-instance.ps1 training-ecp-code training-ecp-data
+.\install-phonebook.ps1 training-ecp-data
+.\install-phonebook.ps1 training-ecp-code
 ```
 
 The module operates on the Phonebook databases, and stack 2 ships only its own `TRAINCODE` /
@@ -286,10 +294,18 @@ running an ISCAgent.
 
 **Prepare both members first**, from `common/course/`:
 
-```
+```bash
 ./prepare-instance.sh training-mirror-a training-mirror-b
 ./install-phonebook.sh training-mirror-a
 ./install-phonebook.sh training-mirror-b
+```
+
+On Windows, in PowerShell:
+
+```powershell
+.\prepare-instance.ps1 training-mirror-a training-mirror-b
+.\install-phonebook.ps1 training-mirror-a
+.\install-phonebook.ps1 training-mirror-b
 ```
 
 Steps 5 and 10-18 all operate on the COMPANY, CUSTOMER and PERSONAL databases and the
@@ -398,8 +414,14 @@ those databases from earlier exercises".
 Re-run the preparation script. It reports `OK` or `FAILED` for each directory, each OS
 account and the student files, and repairs whatever is missing:
 
+```bash
+./prepare-instance.sh training-health
 ```
-./prepare-instance.sh training-health          # or  .\prepare-instance.ps1 training-health
+
+On Windows, in PowerShell:
+
+```powershell
+.\prepare-instance.ps1 training-health
 ```
 
 It is idempotent and leaves a populated `/Management` alone, so nothing done during the

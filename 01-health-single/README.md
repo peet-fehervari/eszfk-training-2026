@@ -51,6 +51,14 @@ cd ../common/course
 ./install-phonebook.sh training-health      # optional; installs the Phonebook application
 ```
 
+On Windows, in PowerShell:
+
+```powershell
+cd ..\common\course
+.\prepare-instance.ps1 training-health
+.\install-phonebook.ps1 training-health
+```
+
 See [common/course/README.md](../common/course/README.md). The exercise directories
 (`/Management`, `/databases`, `/backups`, `/journals`) are already volumes in this stack's
 compose file, so only their ownership and the OS accounts have to be set up - which is what

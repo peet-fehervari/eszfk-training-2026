@@ -40,10 +40,22 @@ common/course/material/
 
 `Thumbs.db` and any other Windows artefact can be skipped.
 
-To keep either of them somewhere else: `COURSE_MATERIAL_DIR=/somewhere/else
-./prepare-instance.sh training-health` for the files, and for the key copy `.env.example`
-to `.env` **in the stack directory you start** and set `IRIS_KEY_DIR`. A `.env` in the
-repository root is not read - Compose only reads the one next to the compose file it runs.
+To keep the student files somewhere else, point `COURSE_MATERIAL_DIR` at it:
+
+```bash
+COURSE_MATERIAL_DIR=/somewhere/else ./prepare-instance.sh training-health
+```
+
+PowerShell has no inline form for that, so it is two lines:
+
+```powershell
+$env:COURSE_MATERIAL_DIR = "C:\somewhere\else"
+.\prepare-instance.ps1 training-health
+```
+
+For the key, copy `.env.example` to `.env` **in the stack directory you start** and set
+`IRIS_KEY_DIR`. A `.env` in the repository root is not read - Compose only reads the one next
+to the compose file it runs.
 
 ## 2. Install
 
@@ -56,7 +68,16 @@ cd ../common/course
 ./prepare-instance.sh training-health
 ```
 
-On Windows, the same script in PowerShell: `.\prepare-instance.ps1 training-health`.
+On Windows, in PowerShell:
+
+```powershell
+cd 01-health-single
+docker compose up -d
+docker compose ps
+
+cd ..\common\course
+.\prepare-instance.ps1 training-health
+```
 
 That is the whole installation. It creates, inside the container:
 
@@ -81,7 +102,13 @@ has to be set for the default course layout.
 ## 3. Optional - skip ahead past the application setup
 
 ```bash
-./install-phonebook.sh training-health          # .\install-phonebook.ps1 on Windows
+./install-phonebook.sh training-health
+```
+
+On Windows, in PowerShell:
+
+```powershell
+.\install-phonebook.ps1 training-health
 ```
 
 **This script does exercise work**, and it is the only one that does. It runs the course's
@@ -143,6 +170,14 @@ time:
 ./install-phonebook.sh training-mirror-b
 ```
 
+On Windows, in PowerShell:
+
+```powershell
+.\prepare-instance.ps1 training-mirror-a training-mirror-b
+.\install-phonebook.ps1 training-mirror-a
+.\install-phonebook.ps1 training-mirror-b
+```
+
 Both modules work on the Phonebook databases on *both* machines, so if you are doing the
 Configuration and Applications modules by hand instead, do them on both.
 [COURSE-NOTES.md](COURSE-NOTES.md) lists the exact settings for each of the two modules.
@@ -163,6 +198,15 @@ Full reset, discarding everything including the work done in the exercises:
 docker compose down -v && docker compose up -d
 ../common/course/prepare-instance.sh training-health
 ../common/course/install-phonebook.sh training-health    # only if it was used before
+```
+
+On Windows, in PowerShell:
+
+```powershell
+docker compose down -v
+docker compose up -d
+..\common\course\prepare-instance.ps1 training-health
+..\common\course\install-phonebook.ps1 training-health    # only if it was used before
 ```
 
 Use `-v`. A `down` without it keeps the volumes but the Phonebook installer will not
