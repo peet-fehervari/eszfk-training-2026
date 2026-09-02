@@ -23,7 +23,7 @@ name: iris-training-ecp
 services:
   # ---------------------------------------------------------------- data server
   data:
-    image: containers.intersystems.com/intersystems/iris:2026.1
+    image: containers.intersystems.com/intersystems/irishealth:2026.1
     container_name: training-ecp-data
     restart: unless-stopped
     entrypoint: ["/tini", "--", "/irisdev/common/start.sh"]
