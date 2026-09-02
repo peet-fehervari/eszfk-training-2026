@@ -44,16 +44,43 @@ now offers *Create Mirror* and *Join Mirror as Failover*.
   name**, not `localhost` - member B resolves this name on the stack network, and
   `localhost` there would mean member B itself.
 
-**Observable result:** the *Mirror Monitor* shows `MEMBERA` as `Primary`, status `Active`.
-The monitor sits one level below the portal home page, not under *Configuration*; once a
-mirror exists the home page links to it directly.
+**Observable result:** the *Mirror Monitor* - **System Operation** → **Mirror Monitor**, not
+under *Configuration*; once a mirror exists the portal home page links to it directly - is
+headed *This system is a failover member in mirror TRAINMIRROR*, and shows one member:
+
+| Panel | What it says with only member A in the mirror |
+|---|---|
+| Mirror Failover Member Information | `MEMBERA`, superserver and mirror private address `mirror-a`; the *Other Failover Member* column is `n/a` |
+| Mirror Member Status | one row: `MEMBERA` \| Failover \| **Primary** \| Journal Transfer `N/A` \| Dejournaling `N/A` |
+| Mirrored Databases | `No Results` |
+
+The *Status* column holds the **role**, so `Primary` is the whole answer there - the monitor
+never prints `Active`. That word belongs to the `SYS.Mirror` API used in step 4, which reports
+role and status as two values (`Primary Active`). Journal Transfer and Dejournaling are `N/A`
+because there is no partner to transfer to yet, and the database list stays empty until step 3.
+
+**The *Arbiter Connection Status* panel reads *Arbiter not configured* and *This member is not
+connected to the arbiter*. Nothing is wrong.** This stack has no arbiter on purpose - see
+[README.md](README.md) and the compose file header. The *Failover Mode* on that panel is
+therefore `Agent Controlled`, which is exactly why the takeover in step 7 has to be an operator
+decision.
 
 ## 3. Add the database to the mirror on member A
 
-In the *Mirror Monitor*, *Add databases to mirror*, and pick `MIRRORDATA`.
+**System Administration** → **Configuration** → **Local Databases** → *Add to Mirror*, and
+tick `MIRRORDATA`.
+
+*Add to Mirror* is a button in the page's toolbar, next to *Create New Database*, and it only
+appears once this instance is a member of a mirror - so after step 2, not before.
+
+**Not in the Mirror Monitor.** The monitor's *Mount* / *Activate* / *Catchup* / *Remove* actions
+operate on databases that are **already** in the mirror, so while nothing has been added their
+lists are empty: choosing *Mount* → *Go* there opens a dialog that says `No Results`. That is
+the empty list, not a failure.
 
 **Observable result:** `MIRRORDATA` is listed as a mirrored database of
-`TRAINMIRROR`, and its journalling stays on.
+`TRAINMIRROR`, and its journalling stays on. The monitor's *Mirrored Databases* panel, which
+read `No Results` a moment ago, now has a row for it.
 
 ## 4. Join member B as the second failover member
 
@@ -69,9 +96,14 @@ On member B's portal: **System Administration** → **Configuration** → **Mirr
 With TLS off the joining member registers itself with the primary, so there is
 nothing to approve on member A.
 
-**Observable result:** within a few seconds, member A's monitor shows `MEMBERB` as
-`Backup`/`Active`, and member B's monitor shows the same pair from its own side. From a
-session on either member, the same view in one line:
+**Observable result:** within a few seconds, member A's *Mirror Member Status* has a second
+row, `MEMBERB` | Failover | **Backup**, the *Other Failover Member* column fills in, and the
+`N/A`s in *Journal Transfer* and *Dejournaling* turn into live values now that there is a
+partner to transfer to. Member B's monitor shows the same pair from its own side.
+
+The API is the exact check, and it is the one place the word `Active` appears - it reports role
+and status as two separate values, so a healthy pair reads `MEMBERA Primary Active` /
+`MEMBERB Backup Active`. From a session on either member:
 
 ```
 do ##class(SYS.Mirror).GetFailoverMemberStatus(.t,.o) write $listget(t,1)," ",$listget(t,3)," / ",$listget(o,1)," ",$listget(o,3)
