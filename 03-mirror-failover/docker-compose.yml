@@ -30,7 +30,7 @@ name: iris-training-mirror
 
 services:
   mirror-a:
-    image: containers.intersystems.com/intersystems/iris:2026.1
+    image: containers.intersystems.com/intersystems/irishealth:2026.1
     container_name: training-mirror-a
     hostname: mirror-a
     restart: unless-stopped
@@ -93,7 +93,7 @@ services:
         max-file: "3"
 
   mirror-b:
-    image: containers.intersystems.com/intersystems/iris:2026.1
+    image: containers.intersystems.com/intersystems/irishealth:2026.1
     container_name: training-mirror-b
     hostname: mirror-b
     restart: unless-stopped

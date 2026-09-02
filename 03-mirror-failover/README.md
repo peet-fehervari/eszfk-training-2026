@@ -49,11 +49,13 @@ member has joined anything.
 
 ## No arbiter, no virtual IP
 
-**No arbiter** because the specification asks for two failover members. The
-consequence is the interesting part: a member that loses contact with its partner
-cannot distinguish a dead partner from a broken network, so it never promotes itself.
-Takeover is an operator decision, made in the portal on member B (or with
-`SYS.Mirror.BecomePrimary()`) after member A has been stopped.
+**No arbiter**, and none is needed: the specification asks for two failover members, and the
+mirror runs without one. The consequence is the interesting part. Stop member A's whole
+container - which takes its ISCAgent with it - and member B cannot distinguish a dead partner
+from a broken network, so it stays the backup. Takeover is then an operator decision, made in
+the portal on member B or with `SYS.Mirror.BecomePrimary()`. (Stopping only IRIS with
+`iris stop` leaves the agent answering, which is a different case; [EXERCISE.md](EXERCISE.md)
+step 7 says which to use.)
 
 **No virtual IP** because a mirror VIP requires the members to share a subnet on which
 an interface can be moved from one host to the other. A Docker bridge network does not
@@ -90,9 +92,14 @@ Where to look next:
   mirrored database to a non-primary member by itself: on the backup, create the database
   through the portal with *Mirrored Database: Yes*, and its data is fetched from the primary
   on save. No journal point, no `AddDatabaseNonPrimary`. This is the route the course's own
-  mirroring module takes, and it is written up step by step in
-  [../common/course/COURSE-NOTES.md](../common/course/COURSE-NOTES.md) under *Mirroring*. It
-  has not been run on this pair yet, but it needs nothing that is missing here.
+  mirroring module takes, and it is now written out as step 5 of [EXERCISE.md](EXERCISE.md).
+  It has not been run on this pair yet, but it needs nothing that is missing here.
+- **What probably blocks it:** `cpf/member-b.cpf` already creates `MIRRORDATA` on member B, in
+  the same directory, so there is a local database and an `IRIS.DAT` in the way - and IRIS
+  refuses to create a database over a leftover file (`ERROR #20: the file already exists`).
+  Step 5 therefore deletes B's copy first. Dropping the `CreateDatabase` line from
+  `member-b.cpf` would remove the obstacle instead, at the cost of the two members no longer
+  starting out symmetrical.
 - `SYS.Mirror:JournalList(MirrorName)` and `SYS.Mirror:MissingMirroredDatabases(MirrorSetName)`
   are queries on a live instance; the second is what the portal's backup-side page
   lists, and it should give the values the call wants.
